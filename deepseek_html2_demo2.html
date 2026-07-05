@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高保真原型：本体让Agent从“盲猜”到“可证”</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #080c11;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 16px;
+        }
+        .container {
+            max-width: 1360px;
+            width: 100%;
+            background-color: #111820;
+            border-radius: 28px;
+            padding: 24px 28px 20px 28px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+            border: 1px solid #28303f;
+        }
+
+        /* 头部 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .header-left h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #e8edf5;
+            letter-spacing: 0.5px;
+        }
+        .header-left h1 span.highlight {
+            color: #4da1ff;
+        }
+        .header-left .sub {
+            color: #7a8aa3;
+            font-size: 13px;
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .header-left .sub .tag {
+            background: #1a2535;
+            padding: 1px 12px;
+            border-radius: 20px;
+            color: #a0b8d0;
+            font-size: 11px;
+            border: 1px solid #2a3b50;
+        }
+        .header-right {
+            color: #4a6a8a;
+            font-size: 12px;
+            background: #0f1720;
+            padding: 4px 14px;
+            border-radius: 30px;
+            border: 1px solid #1f2d40;
+        }
+        .header-right .badge-prototype {
+            color: #f5c542;
+        }
+
+        /* ===== Agent Loop 流程图 ===== */
+        .agent-loop {
+            background: #0a121e;
+            border-radius: 16px;
+            padding: 16px 20px 14px 20px;
+            border: 1px solid #1a2a40;
+            margin-bottom: 16px;
+            position: relative;
+        }
+        .loop-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #6a8aaa;
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+        .loop-title .step-indicator {
+            color: #4da1ff;
+            background: #0f1f2f;
+            padding: 2px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            border: 1px solid #1a3450;
+        }
+
+        .loop-steps {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 4px;
+            flex-wrap: nowrap;
+        }
+        .loop-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            padding: 6px 0;
+            border-radius: 10px;
+            background: transparent;
+        }
+        .loop-step:hover {
+            background: #0f1a2a;
+        }
+        .loop-step .step-dot {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            color: #5a6f8c;
+            background: #0f1a2a;
+            border: 2px solid #1a2a40;
+            transition: all 0.4s ease;
+            position: relative;
+            z-index: 2;
+        }
+        .loop-step.active .step-dot {
+            background: #1a3a6a;
+            border-color: #4da1ff;
+            color: #e8edf5;
+            box-shadow: 0 0 20px rgba(77, 161, 255, 0.3);
+        }
+        .loop-step.done .step-dot {
+            background: #1a3a3a;
+            border-color: #3a8a7a;
+            color: #6ac8b0;
+        }
+        .loop-step .step-label {
+            font-size: 11px;
+            color: #5a6f8c;
+            margin-top: 6px;
+            text-align: center;
+            transition: color 0.3s ease;
+            font-weight: 500;
+        }
+        .loop-step.active .step-label {
+            color: #4da1ff;
+        }
+        .loop-step .step-sub {
+            font-size: 9px;
+            color: #3a4a5a;
+            text-align: center;
+            margin-top: 1px;
+        }
+
+        .loop-arrow {
+            color: #1a2a40;
+            font-size: 18px;
+            flex-shrink: 0;
+            padding: 0 2px;
+            margin-top: -12px;
+        }
+
+        /* ===== 控制按钮区 ===== */
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 10px 16px;
+            background: #0a121e;
+            border-radius: 12px;
+            border: 1px solid #1a2a3a;
+            margin-bottom: 16px;
+        }
+        .controls .btn-group {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .controls button {
+            background: #0f1a2a;
+            border: 1px solid #1a2a40;
+            color: #a0b8d0;
+            padding: 6px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+        .controls button:hover {
+            background: #1a2a4a;
+            border-color: #2a4a6a;
+            color: #e8edf5;
+        }
+        .controls button.primary {
+            background: #1a3a6a;
+            border-color: #2a5a8a;
+            color: #e8edf5;
+        }
+        .controls button.primary:hover {
+            background: #2a4a7a;
+        }
+        .controls button.active-mode {
+            background: #1a3a3a;
+            border-color: #3a8a7a;
+            color: #6ac8b0;
+        }
+        .controls .mode-label {
+            color: #5a6f8c;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+        .controls .mode-toggle {
+            display: flex;
+            gap: 4px;
+            background: #0f1a2a;
+            border-radius: 8px;
+            padding: 3px;
+            border: 1px solid #1a2a3a;
+        }
+        .controls .mode-toggle button {
+            border: none;
+            background: transparent;
+            padding: 4px 14px;
+            font-size: 12px;
+            border-radius: 6px;
+            color: #5a6f8c;
+        }
+        .controls .mode-toggle button.active {
+            background: #1a3a6a;
+            color: #e8edf5;
+        }
+        .controls .step-counter {
+            color: #4a6a8a;
+            font-size: 13px;
+            margin-left: auto;
+            font-weight: 500;
+        }
+
+        /* ===== 对比卡片区 ===== */
+        .compare-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            min-height: 320px;
+            transition: all 0.3s ease;
+        }
+        .compare-area.single {
+            grid-template-columns: 1fr;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .compare-area.single .card-left {
+            display: block;
+        }
+        .compare-area.single .card-right {
+            display: block;
+        }
+        .compare-area.single .card-left.hidden-card,
+        .compare-area.single .card-right.hidden-card {
+            display: none;
+        }
+
+        .compare-card {
+            border-radius: 14px;
+            padding: 16px 18px;
+            border: 1px solid #223040;
+            background: #0d141e;
+            transition: all 0.4s ease;
+        }
+        .compare-card .card-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .compare-card .card-body {
+            font-size: 13px;
+            line-height: 1.7;
+            color: #c8d0dc;
+        }
+        .compare-card .card-body .highlight-red {
+            color: #f07a7a;
+            font-weight: 500;
+        }
+        .compare-card .card-body .highlight-blue {
+            color: #4da1ff;
+            font-weight: 500;
+        }
+        .compare-card .card-body .highlight-yellow {
+            color: #f5c542;
+            font-weight: 500;
+        }
+        .compare-card .card-body .capability {
+            background: #0f1f2f;
+            border-left: 3px solid #4da1ff;
+            padding: 8px 14px;
+            margin: 8px 0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .compare-card .card-body .problem {
+            background: #1f1414;
+            border-left: 3px solid #a54a4a;
+            padding: 8px 14px;
+            margin: 8px 0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .compare-card .card-body .badge {
+            display: inline-block;
+            background: #1a2535;
+            padding: 0 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            color: #a0b8d0;
+            border: 1px solid #2a3b50;
+        }
+        .compare-card .card-body .data-sim {
+            background: #0a121e;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #7a9aba;
+            margin: 6px 0;
+            border: 1px solid #1a2a3a;
+        }
+        .compare-card .card-body .data-sim .highlight {
+            color: #f5c542;
+        }
+        .compare-card .card-body .tool-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 4px 0;
+        }
+        .compare-card .card-body .tool-list .tool-item {
+            background: #0f1a2a;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            border: 1px solid #1a2a3a;
+            color: #7a9aba;
+        }
+        .compare-card .card-body .tool-list .tool-item.highlight-tool {
+            border-color: #4da1ff;
+            color: #4da1ff;
+        }
+        .compare-card .card-body .tool-list .tool-item.dim-tool {
+            opacity: 0.4;
+        }
+
+        .card-left {
+            border-color: #3d2626;
+            background: #120f0f;
+        }
+        .card-left .card-title {
+            color: #f07a7a;
+        }
+        .card-right {
+            border-color: #1a3450;
+            background: #0e1a2a;
+        }
+        .card-right .card-title {
+            color: #4da1ff;
+        }
+
+        .step-icon {
+            font-size: 18px;
+        }
+
+        /* ===== 底部总结 ===== */
+        .footer-summary {
+            background: #09101a;
+            border-radius: 14px;
+            padding: 14px 24px;
+            border: 1px solid #1a2a40;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .footer-summary .quote {
+            color: #c8d8ec;
+            font-size: 15px;
+            line-height: 1.6;
+            flex: 1;
+        }
+        .footer-summary .quote strong {
+            color: #f5c542;
+        }
+        .footer-summary .tagline {
+            background: #14202e;
+            padding: 4px 18px;
+            border-radius: 40px;
+            color: #4da1ff;
+            font-size: 13px;
+            border: 1px solid #1a3450;
+            white-space: nowrap;
+        }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 900px) {
+            .container {
+                padding: 16px;
+            }
+            .loop-steps {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .loop-step {
+                flex: 0 0 auto;
+                min-width: 60px;
+            }
+            .loop-arrow {
+                display: none;
+            }
+            .compare-area {
+                grid-template-columns: 1fr;
+            }
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .controls .step-counter {
+                margin-left: 0;
+                text-align: center;
+            }
+            .header-left h1 {
+                font-size: 20px;
+            }
+        }
+        @media (max-width: 500px) {
+            .loop-step .step-label {
+                font-size: 9px;
+            }
+            .loop-step .step-dot {
+                width: 28px;
+                height: 28px;
+                font-size: 11px;
+            }
+            .compare-card {
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- 头部 -->
+    <div class="header">
+        <div class="header-left">
+            <h1>本体让Agent从<span class="highlight">“盲猜”</span>到<span class="highlight">“可证”</span></h1>
+            <div class="sub">
+                <span>Agent五段式处理流程对比 · 以基站节能关断为例</span>
+                <span class="tag">⏱ 闲时关断 · 降本增效</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <span class="badge-prototype">⚡ 高保真原型</span> · 可交互
+        </div>
+    </div>
+
+    <!-- ===== Agent Loop 流程图 ===== -->
+    <div class="agent-loop">
+        <div class="loop-title">
+            <span>🔄 Agent 处理闭环</span>
+            <span class="step-indicator" id="stepIndicator">步骤 1 / 5</span>
+        </div>
+        <div class="loop-steps" id="loopSteps">
+            <div class="loop-step active" data-step="0">
+                <div class="step-dot">1</div>
+                <div class="step-label">任务理解</div>
+                <div class="step-sub">意图解析</div>
+            </div>
+            <div class="loop-arrow">▸</div>
+            <div class="loop-step" data-step="1">
+                <div class="step-dot">2</div>
+                <div class="step-label">信息感知</div>
+                <div class="step-sub">数据获取</div>
+            </div>
+            <div class="loop-arrow">▸</div>
+            <div class="loop-step" data-step="2">
+                <div class="step-dot">3</div>
+                <div class="step-label">推理决策</div>
+                <div class="step-sub">分析判断</div>
+            </div>
+            <div class="loop-arrow">▸</div>
+            <div class="loop-step" data-step="3">
+                <div class="step-dot">4</div>
+                <div class="step-label">动作执行</div>
+                <div class="step-sub">下发指令</div>
+            </div>
+            <div class="loop-arrow">▸</div>
+            <div class="loop-step" data-step="4">
+                <div class="step-dot">5</div>
+                <div class="step-label">结果验证</div>
+                <div class="step-sub">确认效果</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 控制按钮 ===== -->
+    <div class="controls">
+        <div class="btn-group">
+            <button id="btnPrev" title="上一步">◀ 上一步</button>
+            <button id="btnNext" class="primary" title="下一步">下一步 ▶</button>
+            <button id="btnAutoPlay" title="自动播放">▶ 自动播放</button>
+        </div>
+        <div class="mode-toggle">
+            <button id="modeCompare" class="active" title="左右对比模式">左右对比</button>
+            <button id="modeLeft" title="仅看无本体">仅看无本体</button>
+            <button id="modeRight" title="仅看有本体">仅看有本体</button>
+        </div>
+        <span class="step-counter" id="stepCounter">步骤 1 / 5</span>
+    </div>
+
+    <!-- ===== 对比卡片区 ===== -->
+    <div class="compare-area" id="compareArea">
+        <!-- 左侧：无本体 -->
+        <div class="compare-card card-left" id="cardLeft">
+            <div class="card-title"><span class="step-icon">⚠️</span> 无本体</div>
+            <div class="card-body" id="leftBody">
+                <!-- 由 JS 动态填充 -->
+            </div>
+        </div>
+        <!-- 右侧：有本体 -->
+        <div class="compare-card card-right" id="cardRight">
+            <div class="card-title"><span class="step-icon">✅</span> 有本体</div>
+            <div class="card-body" id="rightBody">
+                <!-- 由 JS 动态填充 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 底部总结 ===== -->
+    <div class="footer-summary">
+        <div style="font-size:22px;">⚡</div>
+        <div class="quote">
+            <strong>本体不是 Agent 的“外挂”，而是 Agent 的“神经系统”</strong> —— 没有它，Agent 是盲的，每一步都在猜；有了它，Agent 从感知到验证，每一步都有据可循。
+        </div>
+        <div class="tagline"># 本体让 Agent 讲逻辑</div>
+    </div>
+
+</div>
+
+<script>
+    // ========================================
+    // 数据定义：每个步骤的左右对比内容
+    // ========================================
+    const stepData = [{
+        // 步骤0：任务理解
+        left: `
+            <div><span class="highlight-red">指令</span>：“判断基站 A 能不能关断”</div>
+            <div class="problem"><span class="highlight-red">问题：</span>“关断”是物理断电？软件休眠？还是容量降级？Agent 需要猜测意图。</div>
+            <div style="margin-top:6px;font-size:12px;color:#7a5a5a;">❌ 结果：意图歧义，可能误操作</div>
+        `,
+        right: `
+            <div><span class="highlight-blue">指令</span>：“判断基站 A 能不能关断”</div>
+            <div class="capability"><span class="highlight-yellow">能力：</span><span class="highlight-blue">意图语义消歧</span> —— 从自然语言的“关断”，精确映射到本体的“节能关断”子类 <span class="badge">Shutdown ⊑ PowerAction</span></div>
+            <div style="margin-top:6px;font-size:12px;color:#4a7a9a;">✅ 结果：精准识别为“节能关断”，自动加载相关约束</div>
+        `
+    }, {
+        // 步骤1：信息感知
+        left: `
+            <div><span class="highlight-red">动作</span>：在海量工具中搜索匹配</div>
+            <div class="data-sim">🔍 扫描 45 个可用工具...<br>匹配结果：<span class="highlight">getCellStatus()</span> (匹配度 28%)<br>getCoverage() (匹配度 12%)<br>getVIPList() (匹配度 9%)<br>... 其余 42 个无关工具</div>
+            <div class="problem"><span class="highlight-red">问题：</span>不知道这些 API 之间的业务关系，不知道“还缺什么数据”。可能漏查关键数据（如 B 站的覆盖）。</div>
+            <div style="margin-top:6px;font-size:12px;color:#7a5a5a;">❌ 结果：数据不完整，判断不可靠</div>
+        `,
+        right: `
+            <div><span class="highlight-blue">动作</span>：基于本体图谱定位相关查询</div>
+            <div class="data-sim">🧭 本体图谱导航：<br>?cell <span class="highlight">:covers</span> ?area .<br>?area <span class="highlight">:level</span> ?level .<br>?cell <span class="highlight">:overlapsWith</span> ?otherCell .</div>
+            <div class="capability"><span class="highlight-yellow">能力：</span><span class="highlight-blue">图谱关系导航</span> —— 自动发现“需要查询覆盖区域、等级、重叠关系”，<span style="color:#4da1ff;">精准定位到 3 个相关工具</span>，补全必要查询，数据无遗漏。</div>
+            <div style="margin-top:6px;font-size:12px;color:#4a7a9a;">✅ 结果：完整获取所需上下文，无遗漏</div>
+        `
+    }, {
+        // 步骤2：推理决策
+        left: `
+            <div><span class="highlight-red">动作</span>：把数据丢给 LLM —— “请判断能不能关断”</div>
+            <div class="problem"><span class="highlight-red">问题：</span>LLM “猜测”规则，可能产生幻觉（Hallucination）——“我觉得普通区域可以关”。<span class="highlight-red">无法解释“为什么能关”</span>，主管不放心。</div>
+            <div style="margin-top:6px;font-size:12px;color:#7a5a5a;">❌ 结果：黑盒决策，无证据链</div>
+        `,
+        right: `
+            <div><span class="highlight-blue">动作</span>：调用推理引擎 —— 基于 TBox 规则 + ABox 事实自动推导</div>
+            <div class="data-sim">📐 推理路径：<br>基站A <span class="highlight">:covers</span> 区域X .<br>基站B <span class="highlight">:covers</span> 区域X .<br>→ <span class="highlight">重叠覆盖</span> 成立 .<br>区域X :level <span class="highlight">"普通"</span> .<br>规则匹配：普通 + 重叠 → 允许关断 .</div>
+            <div class="capability"><span class="highlight-yellow">能力：</span><span class="highlight-blue">确定性推理</span> —— 形式化规则执行，100% 确定性，告别 LLM 幻觉。输出完整证据链，每一步可审计。</div>
+            <div style="margin-top:6px;font-size:12px;color:#4a7a9a;">✅ 结果：可解释的决策，主管放心</div>
+        `
+    }, {
+        // 步骤3：动作执行
+        left: `
+            <div><span class="highlight-red">动作</span>：直接调用 <span class="badge">shutdown(cellA)</span></div>
+            <div class="problem"><span class="highlight-red">问题：</span>执行前无法验证“动作是否合法”——万一 VIP 规则变了？可能误执行，造成故障。</div>
+            <div style="margin-top:6px;font-size:12px;color:#7a5a5a;">❌ 结果：非法操作可能被执行，引发事故</div>
+        `,
+        right: `
+            <div><span class="highlight-blue">动作</span>：先验证执行前条件 —— <span class="badge">PreconditionCheck: ∃backupCoverage(cellA)</span></div>
+            <div class="data-sim">🔒 执行前校验：<br>✓ 基站A 存在重叠覆盖 (基站B)<br>✓ 区域X 等级 = "普通" (非VIP)<br>✓ 约束规则：普通 + 重叠 → 允许关断<br>✅ 所有前置条件满足，允许执行</div>
+            <div class="capability"><span class="highlight-yellow">能力：</span><span class="highlight-blue">动作合法性先验校验</span> —— 执行前验证约束，非法动作自动拦截，并带完整审计日志。</div>
+            <div style="margin-top:6px;font-size:12px;color:#4a7a9a;">✅ 结果：安全执行，可回退</div>
+        `
+    }, {
+        // 步骤4：结果验证
+        left: `
+            <div><span class="highlight-red">动作</span>：查询 cellA.status == "shutdown" → 认为成功</div>
+            <div class="problem"><span class="highlight-red">问题：</span>不知道“成功”的业务定义——是状态变了就行？还是用户无感知？可能 A 关了但 B 没兜底，用户投诉。</div>
+            <div style="margin-top:6px;font-size:12px;color:#7a5a5a;">❌ 结果：虚假成功，用户投诉</div>
+        `,
+        right: `
+            <div><span class="highlight-blue">动作</span>：多维度验证 —— <span class="badge">cellA :hasState :Shutdown ∧ cellB :covers :areaX</span></div>
+            <div class="data-sim">📊 验证结果：<br>✓ 基站A 状态：已关断<br>✓ 覆盖连续性：基站B 覆盖 区域X (兜底生效)<br>✓ VIP 影响：无 (区域X 为普通等级)<br>✓ 节能效果：预计节省 30% 能耗</div>
+            <div class="capability"><span class="highlight-yellow">能力：</span><span class="highlight-blue">多维度成功验证</span> —— 基于本体定义的业务标准，验证覆盖连续性、VIP 未受影响、节能目标达成。</div>
+            <div style="margin-top:6px;font-size:12px;color:#4a7a9a;">✅ 结果：真正的成功，可量化收益</div>
+        `
+    }];
+
+    // ========================================
+    // 状态 & DOM 引用
+    // ========================================
+    let currentStep = 0;
+    let totalSteps = stepData.length;
+    let autoPlayTimer = null;
+    let isAutoPlaying = false;
+    let currentMode = 'compare'; // compare | left | right
+
+    const stepDots = document.querySelectorAll('.loop-step');
+    const leftBody = document.getElementById('leftBody');
+    const rightBody = document.getElementById('rightBody');
+    const cardLeft = document.getElementById('cardLeft');
+    const cardRight = document.getElementById('cardRight');
+    const compareArea = document.getElementById('compareArea');
+    const stepIndicator = document.getElementById('stepIndicator');
+    const stepCounter = document.getElementById('stepCounter');
+
+    // ========================================
+    // 渲染函数
+    // ========================================
+    function renderStep(index) {
+        // 更新流程图高亮
+        stepDots.forEach((dot, i) => {
+            dot.classList.remove('active', 'done');
+            if (i < index) dot.classList.add('done');
+            if (i === index) dot.classList.add('active');
+        });
+
+        // 更新内容
+        leftBody.innerHTML = stepData[index].left;
+        rightBody.innerHTML = stepData[index].right;
+
+        // 更新指示器
+        stepIndicator.textContent = `步骤 ${index + 1} / ${totalSteps}`;
+        stepCounter.textContent = `步骤 ${index + 1} / ${totalSteps}`;
+
+        // 应用模式
+        applyMode(currentMode);
+
+        // 滚动到卡片区（移动端体验优化）
+        if (window.innerWidth < 900) {
+            document.querySelector('.compare-area').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    function applyMode(mode) {
+        currentMode = mode;
+        const area = document.getElementById('compareArea');
+
+        // 更新模式按钮样式
+        document.querySelectorAll('.mode-toggle button').forEach(btn => btn.classList.remove('active'));
+        if (mode === 'compare') document.getElementById('modeCompare').classList.add('active');
+        if (mode === 'left') document.getElementById('modeLeft').classList.add('active');
+        if (mode === 'right') document.getElementById('modeRight').classList.add('active');
+
+        if (mode === 'compare') {
+            area.classList.remove('single');
+            cardLeft.style.display = 'block';
+            cardRight.style.display = 'block';
+            cardLeft.classList.remove('hidden-card');
+            cardRight.classList.remove('hidden-card');
+        } else if (mode === 'left') {
+            area.classList.add('single');
+            cardLeft.style.display = 'block';
+            cardRight.style.display = 'block';
+            cardLeft.classList.remove('hidden-card');
+            cardRight.classList.add('hidden-card');
+        } else if (mode === 'right') {
+            area.classList.add('single');
+            cardLeft.style.display = 'block';
+            cardRight.style.display = 'block';
+            cardLeft.classList.add('hidden-card');
+            cardRight.classList.remove('hidden-card');
+        }
+    }
+
+    // ========================================
+    // 导航函数
+    // ========================================
+    function goToStep(index) {
+        if (index < 0) index = 0;
+        if (index >= totalSteps) index = totalSteps - 1;
+        if (index === currentStep) return;
+        currentStep = index;
+        renderStep(currentStep);
+    }
+
+    function nextStep() {
+        if (currentStep < totalSteps - 1) {
+            goToStep(currentStep + 1);
+        } else if (isAutoPlaying) {
+            // 自动播放到末尾后循环
+            stopAutoPlay();
+            goToStep(0);
+        }
+    }
+
+    function prevStep() {
+        if (currentStep > 0) {
+            goToStep(currentStep - 1);
+        }
+    }
+
+    // ========================================
+    // 自动播放
+    // ========================================
+    function startAutoPlay() {
+        if (isAutoPlaying) return;
+        isAutoPlaying = true;
+        document.getElementById('btnAutoPlay').textContent = '⏸ 暂停';
+        document.getElementById('btnAutoPlay').classList.add('primary');
+        // 如果当前在最后一步，从头开始
+        if (currentStep === totalSteps - 1) {
+            goToStep(0);
+        }
+        autoPlayTimer = setInterval(() => {
+            if (currentStep < totalSteps - 1) {
+                nextStep();
+            } else {
+                stopAutoPlay();
+                goToStep(0);
+                // 短暂延迟后重新开始
+                setTimeout(() => {
+                    if (isAutoPlaying) startAutoPlay();
+                }, 500);
+            }
+        }, 2500);
+    }
+
+    function stopAutoPlay() {
+        isAutoPlaying = false;
+        if (autoPlayTimer) {
+            clearInterval(autoPlayTimer);
+            autoPlayTimer = null;
+        }
+        document.getElementById('btnAutoPlay').textContent = '▶ 自动播放';
+        document.getElementById('btnAutoPlay').classList.remove('primary');
+    }
+
+    function toggleAutoPlay() {
+        if (isAutoPlaying) {
+            stopAutoPlay();
+        } else {
+            startAutoPlay();
+        }
+    }
+
+    // ========================================
+    // 事件绑定
+    // ========================================
+    // 步骤点击
+    stepDots.forEach((dot, i) => {
+        dot.addEventListener('click', () => {
+            if (isAutoPlaying) stopAutoPlay();
+            goToStep(i);
+        });
+    });
+
+    // 按钮
+    document.getElementById('btnPrev').addEventListener('click', () => {
+        if (isAutoPlaying) stopAutoPlay();
+        prevStep();
+    });
+    document.getElementById('btnNext').addEventListener('click', () => {
+        if (isAutoPlaying) stopAutoPlay();
+        nextStep();
+    });
+    document.getElementById('btnAutoPlay').addEventListener('click', toggleAutoPlay);
+
+    // 模式切换
+    document.getElementById('modeCompare').addEventListener('click', () => {
+        if (isAutoPlaying) stopAutoPlay();
+        applyMode('compare');
+    });
+    document.getElementById('modeLeft').addEventListener('click', () => {
+        if (isAutoPlaying) stopAutoPlay();
+        applyMode('left');
+    });
+    document.getElementById('modeRight').addEventListener('click', () => {
+        if (isAutoPlaying) stopAutoPlay();
+        applyMode('right');
+    });
+
+    // 键盘快捷键
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            if (isAutoPlaying) stopAutoPlay();
+            nextStep();
+        }
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (isAutoPlaying) stopAutoPlay();
+            prevStep();
+        }
+        if (e.key === ' ') {
+            e.preventDefault();
+            toggleAutoPlay();
+        }
+    });
+
+    // ========================================
+    // 初始化
+    // ========================================
+    renderStep(0);
+    applyMode('compare');
+
+    console.log('🎯 高保真原型已加载！');
+    console.log('📖 操作提示：');
+    console.log('  - 点击流程节点跳转步骤');
+    console.log('  - ◀/▶ 按钮或键盘 ←/→ 切换');
+    console.log('  - 空格键 自动播放');
+    console.log('  - 切换“左右对比/仅看单边”模式');
+</script>
+</body>
+</html>

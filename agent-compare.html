@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent五段式处理流程对比 — 本体让Agent从"盲猜"到"可证"</title>
+    <style>
+        /* ===== 基础样式 ===== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #080c11;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; padding: 16px;
+        }
+        .container {
+            max-width: 1360px; width: 100%; background-color: #111820;
+            border-radius: 28px; padding: 24px 28px 20px 28px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.9); border: 1px solid #28303f;
+        }
+        /* ===== 头部 ===== */
+        .header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; }
+        .header-left h1 { font-size: 24px; font-weight: 600; color: #e8edf5; letter-spacing: 0.5px; }
+        .header-left h1 span.highlight { color: #4da1ff; }
+        .header-left .sub { color: #7a8aa3; font-size: 13px; margin-top: 2px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .header-left .sub .tag { background: #1a2535; padding: 1px 12px; border-radius: 20px; color: #a0b8d0; font-size: 11px; border: 1px solid #2a3b50; }
+        .header-right { color: #4a6a8a; font-size: 12px; background: #0f1720; padding: 4px 14px; border-radius: 30px; border: 1px solid #1f2d40; }
+        .header-right .badge-prototype { color: #f5c542; }
+        /* ===== Agent Loop 流程图 ===== */
+        .agent-loop { background: #0a121e; border-radius: 16px; padding: 16px 20px 14px 20px; border: 1px solid #1a2a40; margin-bottom: 16px; position: relative; }
+        .loop-title { display: flex; justify-content: space-between; align-items: center; color: #6a8aaa; font-size: 12px; font-weight: 500; letter-spacing: 1px; margin-bottom: 12px; }
+        .loop-title .step-indicator { color: #4da1ff; background: #0f1f2f; padding: 2px 14px; border-radius: 20px; font-size: 12px; border: 1px solid #1a3450; }
+        .loop-steps { display: flex; align-items: center; justify-content: space-between; gap: 4px; flex-wrap: nowrap; }
+        .loop-step { display: flex; flex-direction: column; align-items: center; flex: 1; cursor: pointer; transition: all 0.3s ease; position: relative; padding: 6px 0; border-radius: 10px; background: transparent; }
+        .loop-step:hover { background: #0f1a2a; }
+        .loop-step .step-dot {
+            width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 14px; color: #5a6f8c; background: #0f1a2a; border: 2px solid #1a2a40;
+            transition: all 0.4s ease; position: relative; z-index: 2;
+        }
+        /* 当前步骤：蓝色光晕+脉冲 */
+        .loop-step.active .step-dot {
+            background: #1a3a6a; border-color: #4da1ff; color: #e8edf5;
+            box-shadow: 0 0 20px rgba(77,161,255,0.3);
+            animation: pulse-blue 2s infinite;
+        }
+        @keyframes pulse-blue {
+            0%, 100% { box-shadow: 0 0 20px rgba(77,161,255,0.3); }
+            50% { box-shadow: 0 0 35px rgba(77,161,255,0.55); }
+        }
+        /* 已完成步骤：绿色 */
+        .loop-step.done .step-dot { background: #1a3a3a; border-color: #3a8a7a; color: #6ac8b0; }
+        .loop-step .step-label { font-size: 11px; color: #5a6f8c; margin-top: 6px; text-align: center; transition: color 0.3s ease; font-weight: 500; }
+        .loop-step.active .step-label { color: #4da1ff; }
+        .loop-step .step-sub { font-size: 9px; color: #3a4a5a; text-align: center; margin-top: 1px; }
+        .loop-arrow { color: #1a2a40; font-size: 18px; flex-shrink: 0; padding: 0 2px; margin-top: -12px; }
+        /* ===== 控制按钮区 ===== */
+        .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px; background: #0a121e; border-radius: 12px; border: 1px solid #1a2a3a; margin-bottom: 16px; }
+        .controls .btn-group { display: flex; gap: 6px; align-items: center; }
+        .controls button { background: #0f1a2a; border: 1px solid #1a2a40; color: #a0b8d0; padding: 6px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; transition: all 0.2s ease; font-family: inherit; }
+        .controls button:hover { background: #1a2a4a; border-color: #2a4a6a; color: #e8edf5; }
+        .controls button.primary { background: #1a3a6a; border-color: #2a5a8a; color: #e8edf5; }
+        .controls button.primary:hover { background: #2a4a7a; }
+        .controls .mode-label { color: #5a6f8c; font-size: 12px; margin-left: 8px; }
+        .controls .mode-toggle { display: flex; gap: 4px; background: #0f1a2a; border-radius: 8px; padding: 3px; border: 1px solid #1a2a3a; }
+        .controls .mode-toggle button { border: none; background: transparent; padding: 4px 14px; font-size: 12px; border-radius: 6px; color: #5a6f8c; }
+        .controls .mode-toggle button.active { background: #1a3a6a; color: #e8edf5; }
+        .controls .step-counter { color: #4a6a8a; font-size: 13px; margin-left: auto; font-weight: 500; }
+        /* ===== 对比卡片区 ===== */
+        .compare-area { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-height: 320px; transition: all 0.3s ease; }
+        .compare-area.single { grid-template-columns: 1fr; max-width: 700px; margin: 0 auto; }
+        .compare-card { border-radius: 14px; padding: 16px 18px; border: 1px solid #223040; background: #0d141e; transition: all 0.4s ease; }
+        .compare-card .card-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+        /* 卡片内容淡入淡出动画 */
+        .fade-transition { transition: opacity 0.3s ease; }
+        .compare-card .card-body { font-size: 13px; line-height: 1.7; color: #c8d0dc; }
+        .compare-card .card-body .highlight-red { color: #f07a7a; font-weight: 500; }
+        .compare-card .card-body .highlight-blue { color: #4da1ff; font-weight: 500; }
+        .compare-card .card-body .highlight-yellow { color: #f5c542; font-weight: 500; }
+        .compare-card .card-body .highlight-green { color: #6ac8b0; font-weight: 500; }
+        .compare-card .card-body .capability {
+            background: #0f1f2f; border-left: 3px solid #4da1ff; padding: 8px 14px; margin: 8px 0; border-radius: 4px; font-size: 13px;
+        }
+        .compare-card .card-body .problem {
+            background: #1f1414; border-left: 3px solid #a54a4a; padding: 8px 14px; margin: 8px 0; border-radius: 4px; font-size: 13px;
+        }
+        .compare-card .card-body .badge { display: inline-block; background: #1a2535; padding: 0 10px; border-radius: 12px; font-size: 11px; color: #a0b8d0; border: 1px solid #2a3b50; }
+        /* 右侧卡片：服务类型高亮背景块 */
+        .service-badge {
+            display: inline-block; padding: 4px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+            background: linear-gradient(135deg, rgba(77,161,255,0.15), rgba(77,161,255,0.05));
+            border: 1px solid rgba(77,161,255,0.35); color: #4da1ff; margin-left: 8px;
+        }
+        .compare-card .card-body .data-sim {
+            background: #0a121e; padding: 10px 14px; border-radius: 6px; font-family: 'Courier New', monospace;
+            font-size: 12px; color: #7a9aba; margin: 6px 0; border: 1px solid #1a2a3a; line-height: 1.8;
+        }
+        .compare-card .card-body .data-sim .hl { color: #f5c542; }
+        .card-left { border-color: #3d2626; background: #120f0f; }
+        .card-left .card-title { color: #f07a7a; }
+        .card-right { border-color: #1a3450; background: #0e1a2a; }
+        .card-right .card-title { color: #4da1ff; }
+        .step-icon { font-size: 18px; }
+        /* 设备数据列表 */
+        .device-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+        .device-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #0a121e; border-radius: 6px; border: 1px solid #1a2a3a; font-size: 12px; }
+        .device-item .d-name { font-weight: 600; color: #c8d0dc; min-width: 55px; }
+        .device-item .d-tag { padding: 1px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+        .d-tag-vip { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f07a7a; }
+        .d-tag-ok { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); color: #6ac8b0; }
+        .d-tag-no { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #f07a7a; }
+        /* ===== 底部总结 ===== */
+        .footer-summary { background: #09101a; border-radius: 14px; padding: 14px 24px; border: 1px solid #1a2a40; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 20px; }
+        .footer-summary .quote { color: #c8d8ec; font-size: 15px; line-height: 1.6; flex: 1; }
+        .footer-summary .quote strong { color: #f5c542; }
+        .footer-summary .tagline { background: #14202e; padding: 4px 18px; border-radius: 40px; color: #4da1ff; font-size: 13px; border: 1px solid #1a3450; white-space: nowrap; }
+        /* 服务类型表格 */
+        .onto-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+        .onto-table th { background: rgba(77,161,255,0.08); padding: 6px 10px; text-align: left; color: #4da1ff; font-weight: 600; border-bottom: 1px solid #1a3450; font-size: 11px; }
+        .onto-table td { padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); color: #a0b8d0; }
+        .onto-table tr:last-child td { border-bottom: none; }
+        .onto-table .svc-name { color: #4da1ff; font-weight: 500; }
+        /* ===== 响应式 ===== */
+        @media (max-width: 900px) {
+            .container { padding: 16px; }
+            .loop-steps { flex-wrap: wrap; justify-content: center; }
+            .loop-step { flex: 0 0 auto; min-width: 60px; }
+            .loop-arrow { display: none; }
+            .compare-area { grid-template-columns: 1fr; }
+            .controls { flex-direction: column; align-items: stretch; }
+            .controls .step-counter { margin-left: 0; text-align: center; }
+            .header-left h1 { font-size: 20px; }
+        }
+        @media (max-width: 500px) {
+            .loop-step .step-label { font-size: 9px; }
+            .loop-step .step-dot { width: 28px; height: 28px; font-size: 11px; }
+            .compare-card { padding: 12px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ===== 头部 ===== -->
+    <div class="header">
+        <div class="header-left">
+            <h1>本体让Agent从<span class="highlight">"盲猜"</span>到<span class="highlight">"可证"</span></h1>
+            <div class="sub">
+                <span>Agent五段式处理流程对比 · 无线基站节能关断案例</span>
+                <span class="tag">⏱ AAU-03 · 福田深南大道 · 降本增效</span>
+            </div>
+        </div>
+        <div class="header-right"><span class="badge-prototype">⚡ 交互演示</span> · 可点击</div>
+    </div>
+
+    <!-- 案例信息卡片 -->
+    <div style="background:#0a121e;border-radius:10px;padding:12px 18px;border:1px solid #1a2a40;margin-bottom:16px;font-size:12px;color:#7a9aba;line-height:1.8;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;">
+        <div style="flex:1;min-width:250px;">
+            <span style="color:#f5c542;font-weight:600;">🎯 目标设备：</span>AAU-03（福田区深南大道与彩田路交汇处东侧）<br>
+            <span style="color:#4da1ff;">混合区域</span>（居民区+商铺）· 功耗850W · 覆盖半径120m · PRB利用率12% · RRC连接8 · 非VIP
+        </div>
+        <div style="flex:1;min-width:250px;">
+            <span style="color:#f5c542;font-weight:600;">📡 相邻设备：</span><br>
+            AAU-07：重叠78% ✅VIP(CBD核心区) · 920W · PRB45% · ❌不可兜底<br>
+            AAU-12：重叠65% · 非VIP · 780W · PRB8% · ✅可兜底<br>
+            AAU-05：重叠22% · 非VIP · 810W · PRB15% · ❌重叠度不足
+        </div>
+    </div>
+
+    <!-- ===== Agent Loop 流程图 ===== -->
+    <div class="agent-loop">
+        <div class="loop-title">
+            <span>🔄 Agent 处理闭环</span>
+            <span class="step-indicator" id="stepIndicator">步骤 1 / 5</span>
+        </div>
+        <div class="loop-steps" id="loopSteps">
+            <div class="loop-step active" data-step="0">
+                <div class="step-dot">1</div><div class="step-label">任务理解</div><div class="step-sub">意图解析</div>
+            </div>
+            <div class="loop-arrow">▸</div>
+            <div class="loop-step" data-step="1">
+                <div class="step-dot">2</div><div class="step-label">信息感知</div><div class="step-sub">数据获取</div>
+            </div>
+            <div class="loop-arrow">▸</div>
+            <div class="loop-step" data-step="2">
+                <div class="step-dot">3</div><div class="step-label">推理决策</div><div class="step-sub">分析判断</div>
+            </div>
+            <div class="loop-arrow">▸</div>
+            <div class="loop-step" data-step="3">
+                <div class="step-dot">4</div><div class="step-label">动作执行</div><div class="step-sub">下发指令</div>
+            </div>
+            <div class="loop-arrow">▸</div>
+            <div class="loop-step" data-step="4">
+                <div class="step-dot">5</div><div class="step-label">结果验证</div><div class="step-sub">确认效果</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 控制按钮 ===== -->
+    <div class="controls">
+        <div class="btn-group">
+            <button id="btnPrev" title="上一步（←键）">◀ 上一步</button>
+            <button id="btnNext" class="primary" title="下一步（→键）">下一步 ▶</button>
+            <button id="btnAutoPlay" title="自动播放（空格键）">▶ 自动播放</button>
+        </div>
+        <div class="mode-toggle">
+            <button id="modeCompare" class="active" title="左右对比模式">左右对比</button>
+            <button id="modeLeft" title="仅看无本体">仅无本体</button>
+            <button id="modeRight" title="仅看有本体">仅有本体</button>
+        </div>
+        <span class="step-counter" id="stepCounter">步骤 1 / 5</span>
+    </div>
+
+    <!-- ===== 对比卡片区 ===== -->
+    <div class="compare-area" id="compareArea">
+        <!-- 左侧：无本体（红色❌） -->
+        <div class="compare-card card-left fade-transition" id="cardLeft">
+            <div class="card-title"><span class="step-icon">❌</span> 无本体</div>
+            <div class="card-body" id="leftBody"><!-- JS动态填充 --></div>
+        </div>
+        <!-- 右侧：有本体（蓝色✅） -->
+        <div class="compare-card card-right fade-transition" id="cardRight">
+            <div class="card-title"><span class="step-icon">✅</span> 有本体</div>
+            <div class="card-body" id="rightBody"><!-- JS动态填充 --></div>
+        </div>
+    </div>
+
+    <!-- ===== 底部总结 ===== -->
+    <div class="footer-summary">
+        <div style="font-size:22px;">⚡</div>
+        <div class="quote">
+            <strong>本体不是Agent的"外挂"，而是Agent的"神经系统"——没有它，Agent是盲的</strong><br>
+            <span style="font-size:13px;color:#7a9aba;">左侧：每一步都在猜（黑盒），右侧：每一步都有据可循（白盒）。本体让Agent从"盲猜"到"可证"。</span>
+        </div>
+        <div class="tagline"># 本体让Agent讲逻辑</div>
+    </div>
+
+</div>
+
+<script>
+    // ================================================================
+    // 真实案例数据定义（无线基站节能关断）
+    // ================================================================
+    // 目标：AAU-03（福田区深南大道与彩田路交汇处东侧）
+    //   混合区域(居民区+商铺)、功耗850W、覆盖半径120m、PRB利用率12%、RRC连接8、非VIP
+    // 规则：
+    //   R1 = VIP禁止休眠
+    //   R2 = 普通区 + 有重叠≥50%且PRB≤20%的兜底 → 允许休眠
+    //   R3 = PRB<5%且重叠≥50% → 优先推荐
+    // 结论：AAU-03允许深度休眠（普通推荐）→VIP通过→AAU-12满足兜底(65%,8%)→匹配R2
+
+    const stepData = [
+    // ===== 步骤1：任务理解 =====
+    {
+        left: `
+            <div style="margin-bottom:6px;"><span class="highlight-red">指令：</span>"判断基站 AAU-03 能不能关断"</div>
+            <div class="problem">
+                <span class="highlight-red">问题：</span>Agent猜测"关断"是<span class="highlight-red">深度休眠</span>？<span class="highlight-red">软件复位</span>？还是<span class="highlight-red">硬件下电</span>？意图歧义，可能误执行高危操作。
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#f07a7a;">❌ 结果：意图歧义，可能误执行高危操作</div>
+        `,
+        right: `
+            <div style="margin-bottom:6px;"><span class="highlight-blue">指令：</span>"判断基站 AAU-03 能不能关断"<span class="service-badge">语义消歧服务</span></div>
+            <div class="capability">
+                <span class="highlight-yellow">【语义消歧服务：</span><span class="highlight-blue">基于本体中PowerAction的层级结构（PowerAction⊃EnergySavingAction⊃DeepSleep⊃SoftwareReset⊃HardShutdown），精确识别为"深度休眠（DeepSleep）"子类，自动加载相关约束（需满足R1/R2/R3）】</span>
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#6ac8b0;">✅ 结果：精准识别为"深度休眠"，自动加载全部约束规则</div>
+        `
+    },
+    // ===== 步骤2：信息感知 =====
+    {
+        left: `
+            <div style="margin-bottom:6px;"><span class="highlight-red">动作：</span>在45个API中搜索匹配数据</div>
+            <div class="problem">
+                <span class="highlight-red">问题：</span>在45个API中搜索，<span class="highlight-red">遗漏AAU-12关键数据</span>（重叠65%、PRB8%），只查到AAU-07(VIP)，误判不可关断。
+            </div>
+            <div class="device-list">
+                <div class="device-item"><span class="d-name">AAU-07</span><span class="d-tag d-tag-vip">VIP</span> 重叠78% · PRB45%</div>
+                <div class="device-item" style="opacity:0.4;"><span class="d-name">AAU-12</span><span class="d-tag d-tag-no">❌ 遗漏</span> 数据缺失</div>
+                <div class="device-item" style="opacity:0.4;"><span class="d-name">AAU-05</span><span class="d-tag d-tag-no">❌ 遗漏</span> 数据缺失</div>
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#f07a7a;">❌ 结果：遗漏AAU-12关键数据，误判不可关断</div>
+        `,
+        right: `
+            <div style="margin-bottom:6px;"><span class="highlight-blue">动作：</span>基于本体图谱精准定位<span class="service-badge">API语义索引服务</span></div>
+            <div class="capability">
+                <span class="highlight-yellow">【API语义索引服务：</span><span class="highlight-blue">基于本体对API的语义标注，精准定位所需API，自动补全缺失查询】</span>，精准获取AAU-12数据，形成完整决策上下文。
+            </div>
+            <div class="device-list">
+                <div class="device-item"><span class="d-name">AAU-07</span><span class="d-tag d-tag-vip">VIP</span> 重叠78% · PRB45% · ❌不可兜底</div>
+                <div class="device-item"><span class="d-name">AAU-12</span><span class="d-tag d-tag-ok">✅ 可兜底</span> 重叠65% · PRB8%</div>
+                <div class="device-item"><span class="d-name">AAU-05</span> 重叠22% · PRB15% · ❌重叠不足</div>
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#6ac8b0;">✅ 结果：完整获取所需上下文，无遗漏</div>
+        `
+    },
+    // ===== 步骤3：推理决策 =====
+    {
+        left: `
+            <div style="margin-bottom:6px;"><span class="highlight-red">动作：</span>数据丢给LLM"请判断能不能关断"</div>
+            <div class="problem">
+                <span class="highlight-red">问题：</span>LLM猜测规则产生幻觉，不知R1约束，可能错误认为AAU-07可作兜底。<span class="highlight-red">无法解释"为什么能关"</span>，主管不放心。
+            </div>
+            <div class="data-sim">
+                LLM输出：<span class="hl">"根据数据，AAU-03为非VIP且<br>有相邻设备，建议可以关断。"</span><br>
+                <span style="color:#f07a7a;">⚠ 未引用R1/R2/R3规则，无证据链</span>
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#f07a7a;">❌ 结果：黑盒决策，无证据链，主管不信任</div>
+        `,
+        right: `
+            <div style="margin-bottom:6px;"><span class="highlight-blue">动作：</span>调用推理引擎<span class="service-badge">确定性推理服务</span></div>
+            <div class="capability">
+                <span class="highlight-yellow">【确定性推理服务：</span><span class="highlight-blue">基于本体规则和ABox事实，执行100%确定性推理，输出完整证据链】</span>
+            </div>
+            <div class="data-sim">
+                📐 <span class="hl">推理链：</span><br>
+                ① R1检查 → VIP区域? <span style="color:#f5c542;">AAU-03非VIP</span> → <span style="color:#6ac8b0;">通过</span><br>
+                ② 查找兜底 → AAU-07(VIP)❌ · AAU-12(65%,8%)<br>
+                &nbsp;&nbsp; → R2匹配：重叠≥50%且PRB≤20% <span style="color:#6ac8b0;">✅</span><br>
+                ③ AAU-12满足兜底 → 匹配R2 → <span style="color:#6ac8b0;">允许关断</span>
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#6ac8b0;">✅ 结果：确定性推理，证据链完整，每步可审计</div>
+        `
+    },
+    // ===== 步骤4：动作执行 =====
+    {
+        left: `
+            <div style="margin-bottom:6px;"><span class="highlight-red">动作：</span>直接调用 <span class="badge">shutdown(AAU-03)</span></div>
+            <div class="problem">
+                <span class="highlight-red">问题：</span>直接调用shutdown(AAU-03)，<span class="highlight-red">执行前无法验证AAU-12是否真具备兜底能力</span>。万一AAU-12当时异常？可能造成覆盖空洞。
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#f07a7a;">❌ 结果：无前置校验，可能造成覆盖空洞和用户投诉</div>
+        `,
+        right: `
+            <div style="margin-bottom:6px;"><span class="highlight-blue">动作：</span>执行前校验 <span class="badge">PreconditionCheck</span><span class="service-badge">动作校验服务</span></div>
+            <div class="capability">
+                <span class="highlight-yellow">【动作校验服务：</span><span class="highlight-blue">基于本体定义的Precondition，执行前验证约束，非法动作自动拦截】，校验通过后执行，带审计日志。
+            </div>
+            <div class="data-sim">
+                🔒 <span class="hl">执行前校验：</span><br>
+                ✓ AAU-12 存在且在线（非故障）<br>
+                ✓ AAU-12 与 AAU-03 重叠65% ≥ 50%<br>
+                ✓ AAU-12 PRB=8% ≤ 20%<br>
+                ✓ AAU-03 非VIP区域<br>
+                <span style="color:#6ac8b0;">✅ 全部前置条件满足 → 执行DeepSleep(AAU-03)</span>
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#6ac8b0;">✅ 结果：安全执行，审计日志完整，可回退</div>
+        `
+    },
+    // ===== 步骤5：结果验证 =====
+    {
+        left: `
+            <div style="margin-bottom:6px;"><span class="highlight-red">动作：</span>查询 status=="Shutdown" 即认为成功</div>
+            <div class="problem">
+                <span class="highlight-red">问题：</span>查status=="Shutdown"即认为成功，<span class="highlight-red">不知"成功"业务定义</span>。可能AAU-12没兜住导致投诉。
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#f07a7a;">❌ 结果：虚假成功，AAU-12可能没兜住，用户投诉</div>
+        `,
+        right: `
+            <div style="margin-bottom:6px;"><span class="highlight-blue">动作：</span>多维度验证<span class="service-badge">成功准则验证服务</span></div>
+            <div class="capability">
+                <span class="highlight-yellow">【成功准则验证服务：</span><span class="highlight-blue">基于本体定义的Success Criteria，多维度验证，确保真正成功】</span>
+            </div>
+            <div class="data-sim">
+                📊 <span class="hl">多维验证：</span><br>
+                ✓ 覆盖连续OK：AAU-12成功兜底覆盖区域X<br>
+                ✓ VIP未受影响：区域X为普通等级，无VIP设备<br>
+                ✓ 节能达标：AAU-03功耗 850W→30W<br>
+                <span style="color:#6ac8b0;">✅ 真正成功：覆盖/质量/节能三维度全部达标</span>
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#6ac8b0;">✅ 结果：覆盖连续OK、VIP未受影响、节能达标(850W→30W)</div>
+        `
+    }];
+
+    // ================================================================
+    // 状态 & DOM 引用
+    // ================================================================
+    let currentStep = 0;
+    const totalSteps = stepData.length;
+    let autoPlayTimer = null;
+    let isAutoPlaying = false;
+    let currentMode = 'compare'; // compare | left | right
+
+    const stepDots = document.querySelectorAll('.loop-step');
+    const leftBody = document.getElementById('leftBody');
+    const rightBody = document.getElementById('rightBody');
+    const cardLeft = document.getElementById('cardLeft');
+    const cardRight = document.getElementById('cardRight');
+    const stepIndicator = document.getElementById('stepIndicator');
+    const stepCounter = document.getElementById('stepCounter');
+
+    // ================================================================
+    // 渲染函数（0.3s淡入淡出）
+    // ================================================================
+    function renderStep(index) {
+        // 更新流程图高亮
+        stepDots.forEach((dot, i) => {
+            dot.classList.remove('active', 'done');
+            if (i < index) dot.classList.add('done');
+            if (i === index) dot.classList.add('active');
+        });
+
+        // 淡出 → 更新内容 → 淡入
+        cardLeft.style.opacity = '0';
+        cardRight.style.opacity = '0';
+        setTimeout(() => {
+            leftBody.innerHTML = stepData[index].left;
+            rightBody.innerHTML = stepData[index].right;
+            cardLeft.style.opacity = '1';
+            cardRight.style.opacity = '1';
+        }, 150);
+
+        // 更新指示器
+        stepIndicator.textContent = `步骤 ${index + 1} / ${totalSteps}`;
+        stepCounter.textContent = `步骤 ${index + 1} / ${totalSteps}`;
+
+        // 应用模式
+        applyModeDisplay(currentMode);
+
+        // 移动端滚动到卡片区
+        if (window.innerWidth < 900) {
+            document.querySelector('.compare-area').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    function applyModeDisplay(mode) {
+        const area = document.getElementById('compareArea');
+        if (mode === 'compare') {
+            area.classList.remove('single');
+            cardLeft.style.display = 'block';
+            cardRight.style.display = 'block';
+        } else if (mode === 'left') {
+            area.classList.add('single');
+            cardLeft.style.display = 'block';
+            cardRight.style.display = 'none';
+        } else if (mode === 'right') {
+            area.classList.add('single');
+            cardLeft.style.display = 'none';
+            cardRight.style.display = 'block';
+        }
+    }
+
+    function applyMode(mode) {
+        currentMode = mode;
+        // 更新模式按钮样式
+        document.querySelectorAll('.mode-toggle button').forEach(btn => btn.classList.remove('active'));
+        if (mode === 'compare') document.getElementById('modeCompare').classList.add('active');
+        if (mode === 'left') document.getElementById('modeLeft').classList.add('active');
+        if (mode === 'right') document.getElementById('modeRight').classList.add('active');
+        applyModeDisplay(mode);
+    }
+
+    // ================================================================
+    // 导航函数
+    // ================================================================
+    function goToStep(index) {
+        if (index < 0) index = 0;
+        if (index >= totalSteps) index = totalSteps - 1;
+        if (index === currentStep) return;
+        currentStep = index;
+        renderStep(currentStep);
+    }
+
+    function nextStep() {
+        if (currentStep < totalSteps - 1) {
+            goToStep(currentStep + 1);
+        } else if (isAutoPlaying) {
+            stopAutoPlay();
+            goToStep(0);
+        }
+    }
+
+    function prevStep() {
+        if (currentStep > 0) {
+            goToStep(currentStep - 1);
+        }
+    }
+
+    // ================================================================
+    // 自动播放（3秒间隔）
+    // ================================================================
+    function startAutoPlay() {
+        if (isAutoPlaying) return;
+        isAutoPlaying = true;
+        document.getElementById('btnAutoPlay').textContent = '⏸ 暂停';
+        document.getElementById('btnAutoPlay').classList.add('primary');
+        if (currentStep === totalSteps - 1) goToStep(0);
+        autoPlayTimer = setInterval(() => {
+            if (currentStep < totalSteps - 1) {
+                nextStep();
+            } else {
+                stopAutoPlay();
+                goToStep(0);
+                // 循环后重新开始
+                setTimeout(() => { if (isAutoPlaying) startAutoPlay(); }, 500);
+            }
+        }, 3000);
+    }
+
+    function stopAutoPlay() {
+        isAutoPlaying = false;
+        if (autoPlayTimer) { clearInterval(autoPlayTimer); autoPlayTimer = null; }
+        document.getElementById('btnAutoPlay').textContent = '▶ 自动播放';
+        document.getElementById('btnAutoPlay').classList.remove('primary');
+    }
+
+    function toggleAutoPlay() {
+        if (isAutoPlaying) stopAutoPlay(); else startAutoPlay();
+    }
+
+    // ================================================================
+    // 事件绑定
+    // ================================================================
+    // 流程图节点点击跳转
+    stepDots.forEach((dot, i) => {
+        dot.addEventListener('click', () => { if (isAutoPlaying) stopAutoPlay(); goToStep(i); });
+    });
+
+    // 按钮
+    document.getElementById('btnPrev').addEventListener('click', () => { if (isAutoPlaying) stopAutoPlay(); prevStep(); });
+    document.getElementById('btnNext').addEventListener('click', () => { if (isAutoPlaying) stopAutoPlay(); nextStep(); });
+    document.getElementById('btnAutoPlay').addEventListener('click', toggleAutoPlay);
+
+    // 模式切换
+    document.getElementById('modeCompare').addEventListener('click', () => { if (isAutoPlaying) stopAutoPlay(); applyMode('compare'); });
+    document.getElementById('modeLeft').addEventListener('click', () => { if (isAutoPlaying) stopAutoPlay(); applyMode('left'); });
+    document.getElementById('modeRight').addEventListener('click', () => { if (isAutoPlaying) stopAutoPlay(); applyMode('right'); });
+
+    // 键盘快捷键：←→切换，Space暂停/继续
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') { e.preventDefault(); if (isAutoPlaying) stopAutoPlay(); nextStep(); }
+        if (e.key === 'ArrowLeft') { e.preventDefault(); if (isAutoPlaying) stopAutoPlay(); prevStep(); }
+        if (e.key === ' ') { e.preventDefault(); toggleAutoPlay(); }
+    });
+
+    // ================================================================
+    // 初始化
+    // ================================================================
+    renderStep(0);
+    applyMode('compare');
+
+    console.log('🎯 Agent五段式处理流程对比 — 无线基站节能关断案例');
+    console.log('📖 操作：点击流程节点 | ←→键切换 | 空格自动播放 | 模式切换');
+</script>
+
+<!--
+==========================================
+自检清单
+==========================================
+✅ 5个环节：任务理解 / 信息感知 / 推理决策 / 动作执行 / 结果验证
+✅ 6句精确话术（【】内原话）：
+   1. 语义消歧服务：基于本体中PowerAction的层级结构...精确识别为"深度休眠（DeepSleep）"子类，自动加载相关约束（需满足R1/R2/R3）
+   2. API语义索引服务：基于本体对API的语义标注，精准定位所需API，自动补全缺失查询
+   3. 确定性推理服务：基于本体规则和ABox事实，执行100%确定性推理，输出完整证据链
+   4. 动作校验服务：基于本体定义的Precondition，执行前验证约束，非法动作自动拦截
+   5. 成功准则验证服务：基于本体定义的Success Criteria，多维度验证，确保真正成功
+   6. 底部总结："本体不是Agent的'外挂'，而是Agent的'神经系统'——没有它，Agent是盲的"
+✅ 真实Case数据：AAU-03 / AAU-07 / AAU-12 / AAU-05 全部设备参数
+✅ 规则 R1/R2/R3 逐条应用于推理
+✅ 右侧卡片每环节「服务类型名称」高亮背景块（.service-badge）
+✅ Agent Loop顶部流程图：5节点 + 蓝色光晕脉冲 + 已完成绿色 + 可点击跳转
+✅ 控制按钮：上一步/下一步/自动播放(3秒)/模式切换(左右对比|仅无本体|仅有本体)
+✅ 键盘快捷键：←→切换步骤，Space暂停/继续
+✅ 响应式：<900px 双列变单列堆叠，正文≥13px
+✅ 深色Palantir系：深蓝灰底(#1a1f2e系) + 亮蓝(#3b82f6系) + 橙高亮(#f59e0b系)
+✅ 零外部CDN，全内嵌CSS+JS
+✅ 步骤切换0.3s淡入淡出(CSS transition opacity)
+✅ 代码含中文注释
+==========================================
+-->
+</body>
+</html>
