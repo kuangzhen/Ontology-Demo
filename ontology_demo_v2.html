@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>从"AI盲猜"到"AI可证" — 本体语义层价值演示</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg-primary: #0a1628; --bg-secondary: #111d32; --bg-card: #162236; --bg-card-hover: #1a2a42;
+  --border-default: #1e3a5f; --border-highlight: #2563eb;
+  --text-primary: #e2e8f0; --text-secondary: #94a3b8; --text-muted: #64748b;
+  --accent-blue: #3b82f6; --accent-cyan: #06b6d4; --accent-orange: #f97316;
+  --accent-red: #ef4444; --accent-green: #22c55e; --accent-purple: #a855f7; --accent-yellow: #eab308; --accent-pink: #ec4899;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.6; min-height: 100vh; }
+.header { background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%); border-bottom: 1px solid var(--border-default); padding: 24px 40px; position: relative; overflow: hidden; }
+.header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent-red), var(--accent-blue), var(--accent-green)); }
+.header-content { max-width: 1500px; margin: 0 auto; }
+.header h1 { font-size: 28px; font-weight: 700; background: linear-gradient(90deg, var(--text-primary), var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px; }
+.header-subtitle { color: var(--text-secondary); font-size: 15px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.header-tag { background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: var(--accent-blue); padding: 2px 10px; border-radius: 12px; font-size: 12px; }
+.ontology-def { max-width: 1500px; margin: 20px auto 0; padding: 0 40px; }
+.def-card { background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(6, 182, 212, 0.05)); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 16px 24px; display: flex; align-items: flex-start; gap: 16px; }
+.def-icon { width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.def-text { font-size: 14px; color: var(--text-secondary); line-height: 1.8; }
+.def-text strong { color: var(--text-primary); }
+.def-highlight { color: var(--accent-cyan); font-weight: 600; }
+.main-container { max-width: 1500px; margin: 0 auto; padding: 24px 40px 40px; }
+.scene-section { margin-bottom: 32px; }
+.section-title { font-size: 18px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+.section-title .icon { width: 8px; height: 8px; background: var(--accent-orange); border-radius: 50%; }
+.scene-wrapper { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 16px; padding: 24px; position: relative; }
+.scene-grid { display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
+.scene-svg-container { background: var(--bg-primary); border-radius: 12px; padding: 20px; border: 1px solid var(--border-default); }
+.scene-conclusion { background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05)); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 20px; font-size: 14px; }
+.scene-conclusion .conclusion-title { color: var(--accent-green); font-weight: 600; font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.scene-conclusion .conclusion-text { color: var(--text-secondary); line-height: 2; }
+.scene-conclusion .conclusion-text strong { color: var(--text-primary); }
+.multi-agent-panel { margin-top: 16px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 10px; padding: 14px 18px; }
+.multi-agent-title { font-size: 12px; color: var(--accent-purple); font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.agent-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.agent-tag { background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: var(--accent-purple); padding: 4px 10px; border-radius: 8px; font-size: 12px; }
+
+/* ===== 核心对比区：行对齐 Grid 布局 ===== */
+.comparison-section { margin-bottom: 32px; }
+.comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* 列头 */
+.col-hd {
+  padding: 16px 20px; font-size: 16px; font-weight: 600;
+  display: flex; align-items: center; gap: 10px;
+}
+.col-hd-left {
+  background: linear-gradient(90deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05));
+  color: var(--accent-red); border-bottom: 1px solid rgba(239,68,68,0.2);
+}
+.col-hd-right {
+  background: linear-gradient(90deg, rgba(59,130,246,0.15), rgba(59,130,246,0.05));
+  color: var(--accent-blue); border-bottom: 1px solid rgba(59,130,246,0.2);
+}
+
+/* 层标签行 - 跨越两列 */
+.row-div {
+  grid-column: 1 / -1;
+  padding: 8px 20px; font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-default);
+}
+.row-div-ai  { background: rgba(168,85,247,0.1); color: var(--accent-purple); }
+.row-div-biz { background: rgba(236,72,153,0.1); color: var(--accent-pink); }
+.row-div-dat { background: rgba(249,115,22,0.1); color: var(--accent-orange); }
+
+/* 行内容 - 左右各占一列 */
+.row-l { padding: 20px; border-bottom: 1px solid var(--border-default); background: var(--bg-card); border-left: 3px solid var(--accent-red); }
+.row-r { padding: 20px; border-bottom: 1px solid var(--border-default); background: var(--bg-card); border-left: 3px solid var(--accent-cyan); }
+
+/* 底部条 */
+.bottom-bar-new {
+  padding: 14px 20px; font-size: 14px; font-weight: 600; text-align: center;
+}
+.bottom-bar-l {
+  background: linear-gradient(90deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05));
+  color: var(--accent-red); border-top: 1px solid rgba(239,68,68,0.2);
+}
+.bottom-bar-r {
+  background: linear-gradient(90deg, rgba(34,197,94,0.15), rgba(34,197,94,0.05));
+  color: var(--accent-green); border-top: 1px solid rgba(34,197,94,0.2);
+}
+
+/* AI感知层 */
+.ai-perception-box {
+  background: var(--bg-secondary); border-radius: 12px; padding: 16px;
+  border: 1px solid var(--border-default); flex: 1; display: flex; flex-direction: column;
+}
+.ai-perception-title {
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
+  margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.ai-bubble { display: flex; gap: 12px; align-items: flex-start; }
+.ai-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.row-l .ai-avatar { background: rgba(239, 68, 68, 0.15); }
+.row-r .ai-avatar { background: rgba(59, 130, 246, 0.15); }
+.ai-speech {
+  flex: 1; background: var(--bg-primary); border-radius: 12px;
+  padding: 14px 16px; position: relative; font-size: 14px; line-height: 1.8;
+}
+.ai-speech::before {
+  content: ''; position: absolute; left: -6px; top: 14px;
+  width: 12px; height: 12px; background: var(--bg-primary); transform: rotate(45deg);
+}
+.ai-speech .highlight-red { color: var(--accent-red); font-weight: 600; }
+.ai-speech .highlight-blue { color: var(--accent-cyan); font-weight: 600; }
+.ai-speech .evidence-chain {
+  background: rgba(34, 197, 94, 0.1); border-left: 3px solid var(--accent-green);
+  padding: 8px 12px; margin-top: 8px; border-radius: 0 8px 8px 0; font-size: 13px;
+}
+.ai-speech .check-mark { color: var(--accent-green); font-weight: 700; }
+
+/* 左侧：散落交付件 */
+.deliverables-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;
+}
+.deliverable-item {
+  background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: 8px; padding: 10px; font-size: 12px; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 8px;
+}
+.deliverable-item .icon { font-size: 16px; }
+.deliverable-item .label { font-weight: 600; color: var(--text-primary); }
+.deliverable-item .status {
+  margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 4px;
+  background: rgba(239, 68, 68, 0.15); color: var(--accent-red);
+}
+.gap-indicator {
+  margin-top: 12px; padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.08); border: 1px dashed rgba(239, 68, 68, 0.3);
+  border-radius: 8px; font-size: 12px; color: var(--accent-red); text-align: center;
+}
+
+/* ===== 右侧：本体可视化（3D立体知识图谱）===== */
+.onto-viz { display: flex; flex-direction: column; gap: 10px; flex:1; }
+.onto-viz-split { display: flex; gap: 12px; }
+
+/* 模型卡片 - 3D 立体效果 */
+.onto-model-card {
+  flex: 1; background: linear-gradient(145deg, rgba(168,85,247,0.12), rgba(168,85,247,0.03));
+  border: 1px solid rgba(168,85,247,0.25); border-radius: 12px; padding: 14px;
+  position: relative; overflow: visible;
+  box-shadow: 0 4px 24px rgba(168,85,247,0.08), 0 0 1px rgba(168,85,247,0.3);
+}
+.onto-model-card::after {
+  content:''; position:absolute; bottom:-4px; right:-4px; width:100%; height:100%;
+  background: rgba(168,85,247,0.06); border-radius:12px; z-index:-1;
+}
+.onto-card-title {
+  font-size:12px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:8px;
+  color: var(--accent-purple); border-bottom: 1px solid rgba(168,85,247,0.2); padding-bottom:8px;
+}
+
+/* 本体类节点 */
+.onto-class-node {
+  background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 10px;
+  padding: 12px; margin-bottom: 10px; position: relative;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+}
+.onto-class-node:last-child { margin-bottom:0; }
+.onto-class-name {
+  font-size:13px; font-weight:700; color: var(--text-primary); display:flex; align-items:center; gap:8px;
+  padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.05); margin-bottom:8px;
+}
+.onto-class-name .cls-icon {
+  width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center;
+  font-size:12px; flex-shrink:0;
+}
+.onto-class-name .cls-icon.concept { background: rgba(168,85,247,0.2); color:var(--accent-purple); }
+.onto-class-name .cls-icon.entity { background: rgba(59,130,246,0.2); color:var(--accent-blue); }
+
+/* 属性和动作标签 */
+.onto-tags { display:flex; flex-wrap:wrap; gap:6px; }
+.onto-tag {
+  font-size:11px; padding:3px 8px; border-radius:6px; display:flex; align-items:center; gap:4px;
+  border:1px solid;
+}
+.onto-tag.attr { background: rgba(249,115,22,0.1); border-color: rgba(249,115,22,0.25); color: var(--accent-orange); }
+.onto-tag.action { background: rgba(6,182,212,0.1); border-color: rgba(6,182,212,0.25); color: var(--accent-cyan); }
+.onto-tag.constraint { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.25); color: var(--accent-red); }
+.onto-tag.rel { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25); color: var(--accent-green); font-size:11px; }
+
+/* 关系连接线 */
+.onto-relation-bar {
+  display:flex; align-items:center; gap:6px; padding:4px 0; font-size:11px;
+  position:relative; margin:4px 0 4px 20px;
+}
+.onto-relation-bar::before {
+  content:''; position:absolute; left:-14px; top:50%; width:14px; height:1px;
+  background: var(--accent-cyan);
+}
+.onto-relation-label {
+  background: rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.2);
+  padding:2px 8px; border-radius:4px; color:var(--accent-cyan); font-size:10px; white-space:nowrap;
+}
+
+/* 实例3D卡片 */
+.onto-instance-card {
+  flex:1; background: linear-gradient(145deg, rgba(6,182,212,0.08), rgba(6,182,212,0.02));
+  border: 1px solid rgba(6,182,212,0.25); border-radius: 12px; padding: 14px;
+  position:relative; box-shadow: 0 4px 24px rgba(6,182,212,0.06);
+}
+.onto-instance-card::after {
+  content:''; position:absolute; bottom:-3px; right:-3px; width:100%; height:100%;
+  background:rgba(6,182,212,0.04); border-radius:12px; z-index:-1;
+}
+.onto-inst-card-title {
+  font-size:12px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:8px;
+  color: var(--accent-cyan); border-bottom:1px solid rgba(6,182,212,0.2); padding-bottom:8px;
+}
+
+/* 实例条目 */
+.onto-inst-row { display:flex; align-items:center; gap:8px; padding:6px 0; position:relative; }
+.onto-inst-row::before {
+  content:''; position:absolute; left:7px; top:0; bottom:0; width:2px;
+  background: linear-gradient(to bottom, var(--accent-cyan), rgba(6,182,212,0.1));
+}
+.onto-inst-dot {
+  width:16px; height:16px; border-radius:50%; flex-shrink:0; z-index:1;
+  display:flex; align-items:center; justify-content:center; font-size:10px;
+  border:2px solid rgba(6,182,212,0.4); background: var(--bg-primary);
+}
+.onto-inst-dot.active { border-color: var(--accent-green); background: rgba(34,197,94,0.15); }
+.onto-inst-info { font-size:12px; color: var(--text-secondary); }
+.onto-inst-info .inst-name { color: var(--text-primary); font-weight:600; }
+.onto-inst-info .inst-prop { color: var(--text-muted); font-size:10px; }
+
+/* 「是什么」说明气泡 */
+.onto-what-is {
+  background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(6,182,212,0.05));
+  border:1px solid rgba(59,130,246,0.2); border-radius:10px; padding:12px 14px;
+  margin-top:10px; font-size:12px; color: var(--text-secondary); line-height:1.8;
+  position:relative;
+}
+.onto-what-is::before {
+  content:'💡'; position:absolute; top:-10px; left:12px; font-size:16px;
+}
+.onto-what-is .key { color: var(--accent-blue); font-weight:600; }
+.onto-what-is .arrow-up { color: var(--accent-green); }
+
+/* 推理引擎 */
+.onto-reason-box {
+  background: linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.02));
+  border:1px solid rgba(34,197,94,0.25); border-radius:10px; padding:12px;
+  margin-top:8px; display:flex; align-items:flex-start; gap:10px;
+}
+.onto-reason-icon {
+  width:32px; height:32px; border-radius:50%; flex-shrink:0;
+  background: rgba(34,197,94,0.15); display:flex; align-items:center; justify-content:center;
+  font-size:16px;
+}
+.onto-reason-text { font-size:12px; color: var(--text-secondary); line-height:1.7; }
+.onto-reason-text .hl { color: var(--accent-green); font-weight:600; }
+
+/* ===== Row 2 右侧：映射可视化 ===== */
+.mapping-viz {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.mapping-pipe-group {
+  display: flex; align-items: stretch; gap: 0;
+  background: var(--bg-primary); border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--border-default);
+}
+.mapping-pipe-left {
+  background: rgba(249,115,22,0.1); border-right: 1px solid rgba(249,115,22,0.2);
+  padding: 10px 12px; font-size:11px; color: var(--accent-orange); min-width:110px;
+  display:flex; flex-direction:column; justify-content:center;
+}
+.mapping-pipe-left .pipe-label { font-weight:600; font-size:11px; margin-bottom:2px; }
+.mapping-pipe-left .pipe-field { font-size:10px; color: var(--text-muted); }
+.mapping-pipe-arrow {
+  display:flex; align-items:center; justify-content:center; padding:0 8px;
+  background: linear-gradient(90deg, rgba(249,115,22,0.05), rgba(6,182,212,0.05));
+  font-size:16px; color: var(--accent-cyan); font-weight:700; flex-shrink:0;
+}
+.mapping-pipe-right {
+  background: rgba(6,182,212,0.05); padding: 10px 12px; font-size:12px;
+  color: var(--accent-cyan); flex:1; display:flex; align-items:center; gap:6px;
+}
+.mapping-pipe-right .pipe-target { font-weight:600; }
+.mapping-pipe-right .pipe-type {
+  margin-left:auto; font-size:10px; padding:2px 6px; border-radius:4px;
+  font-weight:600;
+}
+.pipe-type-table { background: rgba(59,130,246,0.2); color: var(--accent-blue); }
+.pipe-type-field { background: rgba(6,182,212,0.2); color: var(--accent-cyan); }
+.pipe-type-doc  { background: rgba(249,115,22,0.2); color: var(--accent-orange); }
+
+.mapping-flow-note {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  background: linear-gradient(90deg, rgba(34,197,94,0.08), transparent);
+  border-left: 3px solid var(--accent-green); border-radius: 0 8px 8px 0;
+  font-size:12px; color: var(--text-secondary);
+}
+.mapping-flow-note strong { color: var(--accent-green); }
+
+/* ===== Row 3 右侧：数据→本体映射线 ===== */
+.data-onto-map {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.data-source-row {
+  display: flex; align-items: center; gap: 10px; font-size:12px;
+  padding: 8px 12px; background: var(--bg-primary); border-radius: 8px;
+  border: 1px solid var(--border-default);
+}
+.data-source-icon {
+  width:28px; height:28px; border-radius:6px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:14px;
+  background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.2);
+}
+.data-source-info { flex:1; }
+.data-source-info .ds-name { color: var(--text-primary); font-weight:600; }
+.data-source-info .ds-fields { color: var(--text-muted); font-size:10px; }
+.data-map-arrow {
+  font-size:18px; color: var(--accent-cyan); flex-shrink:0;
+}
+.data-onto-target {
+  padding: 3px 10px; border-radius:6px; font-size:11px; font-weight:600;
+  background: rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.25);
+  color: var(--accent-cyan);
+}
+
+/* 映射关系图示例 */
+.onto-mapping-demo {
+  background: var(--bg-primary); border-radius: 10px; padding: 14px;
+  border: 1px solid var(--border-default); text-align: center;
+}
+.onto-mapping-demo .map-title { font-size:11px; color: var(--text-muted); margin-bottom:8px; }
+.onto-map-graphic {
+  display: flex; align-items: center; justify-content: center; gap: 0;
+  font-size:11px; flex-wrap: wrap;
+}
+.onto-map-node {
+  padding: 6px 12px; border-radius: 8px; font-weight:600; font-size:11px;
+  text-align: center; line-height:1.4;
+}
+.onto-map-node.data {
+  background: rgba(249,115,22,0.1); border:1px solid rgba(249,115,22,0.25);
+  color: var(--accent-orange);
+}
+.onto-map-node.onto {
+  background: rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.25);
+  color: var(--accent-cyan);
+}
+.onto-map-conn {
+  padding: 0 8px; color: var(--accent-green); font-size:20px; font-weight:700;
+}
+.onto-map-label {
+  font-size:10px; color: var(--text-muted); text-align: center; padding: 2px 0;
+}
+
+/* 业务实现层 */
+.implementation-box {
+  background: var(--bg-secondary); border-radius: 10px; padding: 14px;
+  border: 1px solid var(--border-default); flex: 1; display: flex; flex-direction: column;
+}
+.implementation-title {
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
+  margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* 左侧：人脑+经验+代码 */
+.human-brain-flow {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+}
+.brain-node {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(236, 72, 153, 0.05));
+  border: 1px solid rgba(236, 72, 153, 0.3); border-radius: 10px;
+  padding: 10px 14px; text-align: center; flex: 1;
+}
+.brain-node .icon { font-size: 20px; margin-bottom: 4px; }
+.brain-node .label { font-size: 12px; font-weight: 600; color: var(--accent-pink); }
+.brain-node .desc { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.flow-arrow {
+  color: var(--text-muted); font-size: 18px; flex-shrink: 0;
+}
+.flow-arrow.highlight { color: var(--accent-pink); }
+.knowledge-injection {
+  background: rgba(236, 72, 153, 0.08); border: 1px dashed rgba(236, 72, 153, 0.3);
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 14px;
+}
+.knowledge-injection-title {
+  font-size: 11px; font-weight: 600; color: var(--accent-pink);
+  margin-bottom: 6px; display: flex; align-items: center; gap: 6px;
+}
+.knowledge-injection-text {
+  font-size: 12px; color: var(--text-secondary); line-height: 1.7;
+}
+.code-block {
+  background: #0d1117; border-radius: 8px; padding: 16px;
+  font-family: "SF Mono", "Fira Code", monospace; font-size: 13px;
+  line-height: 1.7; overflow-x: auto; position: relative;
+}
+.code-keyword { color: #ff7b72; }
+.code-function { color: #d2a8ff; }
+.code-string { color: #a5d6ff; }
+.code-comment { color: #8b949e; font-style: italic; }
+.code-variable { color: #79c0ff; }
+.code-number { color: #79c0ff; }
+.blackbox-badge {
+  position: absolute; top: 8px; right: 8px;
+  background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4);
+  color: var(--accent-red); padding: 2px 8px; border-radius: 6px;
+  font-size: 11px; font-weight: 600;
+}
+.lost-knowledge {
+  margin-top: 10px; padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: 8px; font-size: 12px; color: var(--text-muted); text-align: center;
+}
+.lost-knowledge .warning { color: var(--accent-red); font-weight: 600; }
+
+/* 右侧：映射工具 */
+.mapping-tool {
+  background: var(--bg-primary); border-radius: 8px; padding: 14px;
+  border: 1px solid var(--border-default); flex: 1;
+}
+.mapping-title {
+  font-size: 13px; font-weight: 600; color: var(--accent-cyan);
+  margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+}
+.mapping-rule {
+  display: flex; align-items: center; gap: 8px; padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px;
+}
+.mapping-rule:last-child { border-bottom: none; }
+.mapping-source {
+  background: rgba(59, 130, 246, 0.15); color: var(--accent-blue);
+  padding: 3px 8px; border-radius: 6px; font-size: 11px; white-space: nowrap;
+}
+.mapping-arrow { color: var(--text-muted); font-size: 14px; }
+.mapping-target { color: var(--text-secondary); flex: 1; }
+.mapping-tag {
+  font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600;
+}
+.tag-table { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
+.tag-field { background: rgba(6, 182, 212, 0.2); color: var(--accent-cyan); }
+.tag-doc { background: rgba(249, 115, 22, 0.2); color: var(--accent-orange); }
+.mapping-desc {
+  font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height: 1.6;
+}
+.mapping-desc strong { color: var(--text-secondary); }
+.mapping-sync {
+  margin-top: 12px; padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(34, 197, 94, 0.03));
+  border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 8px;
+  display: flex; align-items: center; gap: 10px;
+}
+.mapping-sync-icon { font-size: 18px; }
+.mapping-sync-text { font-size: 12px; color: var(--text-secondary); }
+.mapping-sync-text strong { color: var(--accent-green); }
+
+/* 数据层 */
+.data-tables { display: flex; flex-direction: column; gap: 10px; }
+.data-table-card {
+  background: var(--bg-secondary); border-radius: 8px; padding: 12px;
+  border: 1px solid var(--border-default);
+}
+.table-title {
+  font-size: 12px; font-weight: 600; color: var(--accent-orange);
+  margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.table-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  font-size: 12px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.table-row:last-child { border-bottom: none; }
+.table-row .field-name { color: var(--text-muted); }
+.table-row .field-value { color: var(--text-secondary); }
+.fk-connector {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; font-size: 11px; color: var(--text-muted); padding: 4px 0;
+}
+.fk-line {
+  height: 1px; background: var(--text-muted); flex: 1; max-width: 60px;
+  border-bottom: 1px dashed var(--text-muted);
+}
+.semantic-note {
+  text-align: center; font-size: 12px; color: var(--accent-red);
+  margin-top: 8px; font-style: italic;
+}
+.zero-migration-tag {
+  display: inline-block; background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3); color: var(--accent-green);
+  padding: 4px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; margin-top: 8px;
+}
+.arch-position {
+  background: var(--bg-secondary); border: 1px solid var(--border-default);
+  border-radius: 12px; padding: 16px; margin-top: 12px;
+}
+.arch-title { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 10px; }
+.arch-layers { display: flex; flex-direction: column; gap: 6px; }
+.arch-layer {
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px;
+  border-radius: 8px; font-size: 12px;
+}
+.arch-layer-existing {
+  background: rgba(100, 116, 139, 0.15); border: 1px solid rgba(100, 116, 139, 0.3);
+  color: var(--text-secondary);
+}
+.arch-layer-new {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.15), rgba(6, 182, 212, 0.15));
+  border: 1px solid rgba(59, 130, 246, 0.3); color: var(--accent-cyan); font-weight: 600;
+}
+.arch-layer-upper {
+  background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3);
+  color: var(--accent-purple);
+}
+.arch-arrow { text-align: center; color: var(--text-muted); font-size: 14px; padding: 2px 0; }
+
+/* 底部条 */
+.bottom-bar {
+  padding: 14px 20px; font-size: 14px; font-weight: 600; text-align: center; margin-top: auto;
+}
+
+
+/* 反例 */
+.warning-case {
+  background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px; padding: 12px 16px; margin-top: 12px;
+}
+.warning-case-title { font-size: 12px; color: var(--accent-red); font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.warning-case-text { font-size: 12px; color: var(--text-secondary); line-height: 1.7; }
+
+/* 第三问 */
+.why-not-section { margin-bottom: 32px; }
+.why-not-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; cursor: pointer; user-select: none; }
+.why-not-header .toggle-icon {
+  width: 24px; height: 24px; background: var(--accent-orange); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 14px; color: white;
+  transition: transform 0.3s;
+}
+.why-not-header.collapsed .toggle-icon { transform: rotate(-90deg); }
+.why-not-title { font-size: 18px; font-weight: 600; color: var(--accent-orange); }
+.why-not-subtitle { font-size: 13px; color: var(--text-muted); margin-left: 34px; margin-bottom: 16px; }
+.why-not-content { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 16px; overflow: hidden; }
+.three-way-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+.three-way-col { padding: 24px; border-right: 1px solid var(--border-default); }
+.three-way-col:last-child { border-right: none; }
+.three-way-col-header { font-size: 15px; font-weight: 600; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid; display: flex; align-items: center; gap: 8px; }
+.col-a .three-way-col-header { color: var(--accent-red); border-color: var(--accent-red); }
+.col-b .three-way-col-header { color: var(--accent-yellow); border-color: var(--accent-yellow); }
+.col-c .three-way-col-header { color: var(--accent-green); border-color: var(--accent-green); }
+.three-way-item { padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.three-way-item:last-child { border-bottom: none; }
+.three-way-item-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.three-way-item-text { font-size: 13px; color: var(--text-primary); line-height: 1.7; }
+.three-way-item-text .x-mark { color: var(--accent-red); font-weight: 700; }
+.three-way-item-text .q-mark { color: var(--accent-yellow); font-weight: 700; }
+.three-way-item-text .check-mark { color: var(--accent-green); font-weight: 700; }
+.analogy-box {
+  grid-column: 1 / -1; background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(168, 85, 247, 0.03));
+  border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 12px; padding: 20px 24px; margin: 16px 24px 24px;
+}
+.analogy-title { font-size: 14px; font-weight: 600; color: var(--accent-purple); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.analogy-text { font-size: 13px; color: var(--text-secondary); line-height: 1.9; }
+.analogy-text strong { color: var(--text-primary); }
+
+/* ROI */
+.roi-section { margin-bottom: 32px; }
+.roi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.roi-card { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 12px; padding: 20px; text-align: center; }
+.roi-value { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+.roi-value.blue { color: var(--accent-blue); } .roi-value.green { color: var(--accent-green); } .roi-value.orange { color: var(--accent-orange); }
+.roi-label { font-size: 13px; color: var(--text-secondary); }
+.roi-detail { font-size: 12px; color: var(--text-muted); margin-top: 8px; line-height: 1.6; }
+
+/* 总结 */
+.summary-section {
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card));
+  border: 1px solid var(--border-default); border-radius: 16px; padding: 32px 40px;
+  text-align: center; position: relative; overflow: hidden;
+}
+.summary-section::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent-red), var(--accent-blue), var(--accent-green));
+}
+.summary-title { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+.summary-compare { display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+.summary-item { font-size: 15px; line-height: 1.8; max-width: 420px; text-align: left; }
+.summary-item.left { color: var(--text-secondary); } .summary-item.right { color: var(--text-primary); }
+.summary-item .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.summary-item.left .tag { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
+.summary-item.right .tag { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); }
+.summary-arrow { font-size: 24px; color: var(--accent-cyan); }
+.summary-hashtag { font-size: 18px; font-weight: 700; background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.standard-note { text-align: center; font-size: 12px; color: var(--text-muted); margin-top: 16px; }
+.standard-note span { background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); padding: 2px 8px; border-radius: 6px; color: var(--accent-blue); }
+
+@media (max-width: 1000px) {
+  .comparison-grid { grid-template-columns: 1fr; } .scene-grid { grid-template-columns: 1fr; } .three-way-grid { grid-template-columns: 1fr; }
+  .three-way-col { border-right: none; border-bottom: 1px solid var(--border-default); } .three-way-col:last-child { border-bottom: none; }
+  .roi-grid { grid-template-columns: 1fr; } .main-container { padding: 16px 20px; } .header { padding: 16px 20px; } .ontology-def { padding: 0 20px; }
+  .ontology-dual { flex-direction: column; } .deliverables-grid { grid-template-columns: 1fr; } .human-brain-flow { flex-direction: column; } .flow-arrow { transform: rotate(90deg); }
+}
+
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.scene-section, .comparison-section, .why-not-section, .roi-section, .summary-section { animation: fadeInUp 0.6s ease forwards; }
+.comparison-section { animation-delay: 0.1s; } .why-not-section { animation-delay: 0.2s; } .roi-section { animation-delay: 0.3s; } .summary-section { animation-delay: 0.4s; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-content">
+    <h1>从"AI盲猜"到"AI可证"</h1>
+    <div class="header-subtitle">
+      <span>以无线基站节能关断为例</span>
+      <span class="header-tag">闲时关断 · 降本增效</span>
+      <span class="header-tag">本体语义层价值演示</span>
+    </div>
+  </div>
+</div>
+
+<div class="ontology-def">
+  <div class="def-card">
+    <div class="def-icon">📖</div>
+    <div class="def-text">
+      <strong>本体（Ontology）是什么？</strong> 
+      不是数据库，不是代码，也不是文档——而是<span class="def-highlight">业务知识的"机器可读说明书"</span>。
+      它让AI能"读懂"业务规则并<span class="def-highlight">自主推理</span>，而不是每次靠猜测理解规则含义。
+      基于 <span style="color: var(--accent-blue);">W3C语义网标准</span>，机器可自动验证逻辑一致性。
+    </div>
+  </div>
+</div>
+
+<div class="main-container">
+
+  <!-- 场景图 -->
+  <div class="scene-section">
+    <div class="section-title"><div class="icon"></div>业务场景：基站节能关断决策</div>
+    <div class="scene-wrapper">
+      <div class="scene-grid">
+        <div class="scene-svg-container">
+          <svg viewBox="0 0 600 320" width="100%" height="auto" style="max-height: 320px;">
+            <defs>
+              <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+              </pattern>
+              <radialGradient id="coverGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(59,130,246,0.25)"/><stop offset="100%" stop-color="rgba(59,130,246,0.05)"/>
+              </radialGradient>
+              <radialGradient id="overlapGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(249,115,22,0.35)"/><stop offset="100%" stop-color="rgba(249,115,22,0.08)"/>
+              </radialGradient>
+              <radialGradient id="vipGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgba(239,68,68,0.2)"/><stop offset="100%" stop-color="rgba(239,68,68,0.05)"/>
+              </radialGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+              <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#06b6d4"/>
+              </marker>
+            </defs>
+            <rect width="600" height="320" fill="url(#grid)"/>
+            <circle cx="180" cy="160" r="100" fill="url(#coverGrad)" stroke="rgba(59,130,246,0.4)" stroke-width="1.5"/>
+            <circle cx="320" cy="160" r="100" fill="url(#coverGrad)" stroke="rgba(59,130,246,0.4)" stroke-width="1.5"/>
+            <path d="M 230 96 A 100 100 0 0 1 270 96 A 100 100 0 0 1 230 224 A 100 100 0 0 1 270 224 Z" fill="url(#overlapGrad)" stroke="rgba(249,115,22,0.6)" stroke-width="2" stroke-dasharray="5,3"/>
+            <circle cx="480" cy="160" r="90" fill="url(#vipGrad)" stroke="rgba(239,68,68,0.4)" stroke-width="1.5"/>
+            <g transform="translate(180, 160)">
+              <circle cx="0" cy="0" r="18" fill="#162236" stroke="#f97316" stroke-width="2.5"/>
+              <text x="0" y="-28" text-anchor="middle" fill="#f97316" font-size="12" font-weight="600">小区A</text>
+              <text x="0" y="-42" text-anchor="middle" fill="#64748b" font-size="10">待关断</text>
+              <line x1="0" y1="-8" x2="0" y2="8" stroke="#f97316" stroke-width="2"/>
+              <line x1="-8" y1="-4" x2="8" y2="-4" stroke="#f97316" stroke-width="1.5"/>
+              <line x1="-6" y1="0" x2="6" y2="0" stroke="#f97316" stroke-width="1.5"/>
+              <line x1="-4" y1="4" x2="4" y2="4" stroke="#f97316" stroke-width="1.5"/>
+              <circle cx="0" cy="-10" r="3" fill="#f97316"/>
+            </g>
+            <g transform="translate(320, 160)">
+              <circle cx="0" cy="0" r="18" fill="#162236" stroke="#3b82f6" stroke-width="2.5"/>
+              <text x="0" y="-28" text-anchor="middle" fill="#3b82f6" font-size="12" font-weight="600">小区B</text>
+              <text x="0" y="-42" text-anchor="middle" fill="#64748b" font-size="10">覆盖兜底</text>
+              <line x1="0" y1="-8" x2="0" y2="8" stroke="#3b82f6" stroke-width="2"/>
+              <line x1="-8" y1="-4" x2="8" y2="-4" stroke="#3b82f6" stroke-width="1.5"/>
+              <line x1="-6" y1="0" x2="6" y2="0" stroke="#3b82f6" stroke-width="1.5"/>
+              <line x1="-4" y1="4" x2="4" y2="4" stroke="#3b82f6" stroke-width="1.5"/>
+              <circle cx="0" cy="-10" r="3" fill="#3b82f6"/>
+            </g>
+            <g transform="translate(480, 160)">
+              <circle cx="0" cy="0" r="20" fill="#162236" stroke="#ef4444" stroke-width="2.5" filter="url(#glow)"/>
+              <text x="0" y="-30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="600">小区C</text>
+              <text x="0" y="-44" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="700">⭐ VIP商圈</text>
+              <text x="0" y="34" text-anchor="middle" fill="#64748b" font-size="10">绝对禁止关断</text>
+              <line x1="0" y1="-8" x2="0" y2="8" stroke="#ef4444" stroke-width="2"/>
+              <line x1="-8" y1="-4" x2="8" y2="-4" stroke="#ef4444" stroke-width="1.5"/>
+              <line x1="-6" y1="0" x2="6" y2="0" stroke="#ef4444" stroke-width="1.5"/>
+              <line x1="-4" y1="4" x2="4" y2="4" stroke="#ef4444" stroke-width="1.5"/>
+              <circle cx="0" cy="-10" r="3" fill="#ef4444"/>
+              <polygon points="0,-22 -2,-18 -6,-18 -3,-15 -4,-11 0,-13 4,-11 3,-15 6,-18 2,-18" fill="#ef4444"/>
+            </g>
+            <rect x="235" y="200" width="80" height="22" rx="6" fill="rgba(249,115,22,0.15)" stroke="rgba(249,115,22,0.4)" stroke-width="1"/>
+            <text x="275" y="215" text-anchor="middle" fill="#f97316" font-size="10" font-weight="600">重叠覆盖区</text>
+            <path d="M 200 160 L 300 160" stroke="#06b6d4" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrowhead)" opacity="0.6"/>
+            <text x="300" y="300" text-anchor="middle" fill="#64748b" font-size="10">实际判断还需融合：实时负载、切换成功率、历史投诉数据</text>
+          </svg>
+        </div>
+        <div>
+          <div class="scene-conclusion">
+            <div class="conclusion-title"><span>✓</span> 决策结论</div>
+            <div class="conclusion-text">
+              <strong>小区A</strong> 与 <strong>小区B</strong> 覆盖区域存在几何重叠<br>
+              重叠区域 <strong>等级 = 普通</strong>（非VIP）<br>
+              小区A <strong>非VIP商圈</strong>，小区B可提供覆盖兜底<br>
+              <span style="color: #22c55e; font-weight: 600;">→ 判断：可安全关断小区A</span><br>
+              <span style="color: var(--accent-cyan);">时间约束：仅闲时时段（00:00-06:00）允许执行</span><br>
+            </div>
+            <div style="margin-top:10px;padding:10px;background:rgba(100,116,139,0.1);border-radius:8px;font-size:12px;color:var(--text-muted);">
+              <div style="font-weight:600;color:var(--text-secondary);margin-bottom:6px;">📋 完整约束矩阵（实际决策需全部满足）：</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;">
+                <span>✓ 重叠覆盖区域等级 = 普通</span>
+                <span>✓ 兜底小区 RSRP ≥ -105dBm</span>
+                <span>✓ 时段 = 闲时(00:00-06:00)</span>
+                <span>✓ 兜底小区 PRB利用率 &lt; 70%</span>
+                <span>✓ 非VIP小区/栅格</span>
+                <span>✓ 切换成功率 &gt; 95%</span>
+              </div>
+            </div>
+          </div>
+          <div class="multi-agent-panel">
+            <div class="multi-agent-title"><span>🔗</span> 共享本体实体定义，各Agent扩展领域规则</div>
+            <div class="agent-tags">
+              <span class="agent-tag">🔋 节能决策Agent</span>
+              <span class="agent-tag">📡 覆盖优化Agent</span>
+              <span class="agent-tag">⭐ VIP保障Agent</span>
+              <span class="agent-tag">🔧 故障诊断Agent</span>
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:var(--text-muted);line-height:1.5;">
+              各Agent共享"小区/区域/覆盖"等基础实体定义，各自叠加领域规则（节能规则、故障规则、优化规则）
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 核心对比区 -->
+  <div class="comparison-section">
+    <div class="section-title"><div class="icon"></div>核心对比：AI如何"理解"业务规则？</div>
+    <div class="comparison-grid">
+
+      <div class="col-hd col-hd-left"><span>📦❌</span> 传统方式：API黑盒 + 人脑经验</div>
+      <div class="col-hd col-hd-right"><span>🔍✓</span> 本体方式：白盒图谱 + 显性关系</div>
+
+      <!-- Row 1: AI 感知层 -->
+      <div class="row-div row-div-ai">AI 感知层</div>
+      <div class="row-l">
+        <div class="ai-perception-box">
+          <div class="ai-perception-title">AI看到的：散落的交付件</div>
+          <div class="ai-bubble">
+            <div class="ai-avatar">🤖</div>
+            <div class="ai-speech">
+              我需要调用 <span class="highlight-red">多个API</span> 才能拼凑出完整数据：<br><br>
+              调用 <span class="highlight-red">工参查询API</span> 获取小区经纬度<br>
+              调用 <span class="highlight-red">性能统计API</span> 获取负载数据<br>
+              调用 <span class="highlight-red">配置查询API</span> 获取VIP标识<br><br>
+              <span style="color: var(--text-muted);">但这些API之间的关系…… 我只能猜测</span>
+            </div>
+          </div>
+          <div class="deliverables-grid">
+            <div class="deliverable-item"><span class="icon">📄</span><span class="label">PRD文档</span><span class="status">非结构化</span></div>
+            <div class="deliverable-item"><span class="icon">📊</span><span class="label">需求表格</span><span class="status">语义不明</span></div>
+            <div class="deliverable-item"><span class="icon">📘</span><span class="label">接口文档</span><span class="status">仅技术描述</span></div>
+            <div class="deliverable-item"><span class="icon">💬</span><span class="label">沟通记录</span><span class="status">依赖记忆</span></div>
+          </div>
+          <div class="gap-indicator">⚠️ 人不在时，隐性业务知识随人离开而消失</div>
+        </div>
+      </div>
+      <div class="row-r">
+        <div class="ai-perception-box">
+          <div class="ai-perception-title">AI看到的：本体 = 业务知识的「机器可读说明书」</div>
+          <div class="ai-bubble">
+            <div class="ai-avatar">🤖</div>
+            <div class="ai-speech">
+              我「<span class="highlight-blue">读</span>」本体图谱获取确定性事实，LLM理解语义 + 本体验证逻辑 → 互补：<br>
+              <span class="highlight-blue">小区A</span> 和 <span class="highlight-blue">小区B</span> 都 <span class="highlight-blue">覆盖</span> 了区域X<br>
+              区域X的<span class="highlight-blue">等级 = 普通</span><br><br>
+              匹配约束：<span class="highlight-blue">普通 + 重叠 → 允许关断</span><br>
+              <div class="evidence-chain">
+                <span class="check-mark">✓ 确定性输出</span>：可安全关断小区A<br>
+                <span style="font-size: 12px; opacity: 0.8;">每一步都有本体定义的依据，机器可自动验证</span>
+              </div>
+            </div>
+          </div>
+          <div class="onto-viz">
+            <div class="onto-viz-split">
+              <!-- TBox: 模型 -->
+              <div class="onto-model-card">
+                <div class="onto-card-title"><span style="background:var(--accent-purple);color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;margin-right:8px;" title="TBox(Terminology Box)：定义概念、属性、关系的模型层">TBox层</span><span>📐</span> 本体模型（定义规则）</div>
+                <div class="onto-class-node">
+                  <div class="onto-class-name"><span class="cls-icon concept">BS</span> 基站 (BaseStation)</div>
+                  <div class="onto-tags">
+                    <span class="onto-tag attr">⚡ 属性: 名称、位置</span>
+                    <span class="onto-tag rel">🔗 关系: hasActionType = {shutdown, restart}</span>
+                        <span class="onto-tag constraint">🚫 约束: VIP区域禁止关联shutdown</span>
+                  </div>
+                </div>
+                <div class="onto-relation-bar">
+                  <span class="onto-relation-label">covers ▸ 覆盖</span>
+                  <span style="font-size:10px;color:var(--text-muted);">1个基站 ▸ 覆盖 ▸ N个区域</span>
+                </div>
+                <div class="onto-class-node">
+                  <div class="onto-class-name"><span class="cls-icon entity">CA</span> 覆盖区域 (CoverageArea)</div>
+                  <div class="onto-tags">
+                    <span class="onto-tag attr">⚡ 属性: 几何边界、等级(level)</span>
+                    <span class="onto-tag constraint">🚫 约束: level=VIP → 禁止关断</span>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:center;padding:4px 0;">
+                <span style="color:var(--text-muted);font-size:16px;">↓ 实例化</span>
+              </div>
+              <!-- ABox: 实例 -->
+              <div class="onto-instance-card">
+                <div class="onto-inst-card-title"><span style="background:var(--accent-cyan);color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;margin-right:8px;" title="ABox(Assertion Box)：存储具体实例事实的数据层">ABox层</span><span>🔷</span> 本体实例（真实数据）</div>
+                <div class="onto-inst-row">
+                  <div class="onto-inst-dot">A</div>
+                  <div class="onto-inst-info"><span class="inst-name">小区A</span> <span class="inst-prop">位置(113.75, 23.02)</span></div>
+                </div>
+                <div class="onto-inst-row">
+                  <div class="onto-inst-dot">B</div>
+                  <div class="onto-inst-info"><span class="inst-name">小区B</span> <span class="inst-prop">位置(113.80, 23.03)</span></div>
+                </div>
+                <div class="onto-inst-row">
+                  <div class="onto-inst-dot active">X</div>
+                  <div class="onto-inst-info"><span class="inst-name">区域X</span> <span class="inst-prop">等级 = 普通</span></div>
+                </div>
+                <div class="onto-inst-row" style="padding-left:24px;">
+                  <div class="onto-inst-dot" style="border-color:rgba(34,197,94,0.4);font-size:8px;">✓</div>
+                  <div class="onto-inst-info"><span style="color:var(--accent-green);">A ▶ covers ▶ X</span></div>
+                </div>
+                <div class="onto-inst-row" style="padding-left:24px;">
+                  <div class="onto-inst-dot" style="border-color:rgba(34,197,94,0.4);font-size:8px;">✓</div>
+                  <div class="onto-inst-info"><span style="color:var(--accent-green);">B ▶ covers ▶ X</span></div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:center;padding:4px 0;">
+              <span style="color:var(--text-muted);font-size:16px;">↓ 联合推理</span>
+            </div>
+            <div class="onto-what-is">
+              <span class="key">本体是什么？</span> = 模型（定义"基站有什么属性、能做什么、不能做什么"）+ 实例（"小区A具体的经纬度、等级"）<br>
+              <span class="arrow-up">↑ AI不用猜，直接读取图谱就能<span class="key">推理</span>出结论</span>
+            </div>
+            <div style="background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);border-radius:8px 8px 0 0;padding:6px 12px;font-size:11px;color:var(--accent-green);font-weight:600;margin-top:12px;">
+  <span>⚙️</span> 推理引擎层（Rule Engine）
+</div>
+<div class="onto-reason-box" style="border-radius:0 0 8px 8px;">
+              <div class="onto-reason-icon">⚙️</div>
+              <div class="onto-reason-text">
+                <span class="hl">本体+规则引擎联合推理：</span><br>
+                小区A、B均覆盖X 且 X.等级=普通 且 时段=闲时 → <span class="hl">允许关断小区A</span><br>
+                <span style="font-size:11px;color:var(--text-muted);">本体提供事实 + <span title="SWRL(Semantic Web Rule Language)：语义网规则语言，用于表达业务规则">SWRL</span>规则引擎推导 → 确定性结论</span><br>
+                <span style="font-size:11px;color:var(--accent-purple);">LLM负责自然语言理解，本体负责确定性逻辑验证 → 互补架构</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: 业务实现层 -->
+      <div class="row-div row-div-biz">业务实现层</div>
+      <div class="row-l">
+        <div class="implementation-box">
+          <div class="implementation-title">人脑经验 → 代码固化（隐性过程）</div>
+          <div class="human-brain-flow">
+            <div class="brain-node"><div class="icon">🧠</div><div class="label">业务专家</div><div class="desc">理解规则</div></div>
+            <div class="flow-arrow highlight">→</div>
+            <div class="brain-node"><div class="icon">💡</div><div class="label">隐性经验</div><div class="desc">脑中建模</div></div>
+            <div class="flow-arrow highlight">→</div>
+            <div class="brain-node"><div class="icon">💻</div><div class="label">开发工程师</div><div class="desc">转写代码</div></div>
+          </div>
+          <div class="knowledge-injection">
+            <div class="knowledge-injection-title"><span>💉</span> 关键：业务知识注入过程</div>
+            <div class="knowledge-injection-text">
+              业务专家脑中理解 → 口头/文档传达 → 开发工程师编码实现<br>
+              <span style="color: var(--accent-pink);">这个过程中，大量业务知识以"隐性经验"形式存在，从未被形式化记录</span>
+            </div>
+          </div>
+          <div class="code-block">
+            <span class="blackbox-badge">黑盒</span>
+            <span class="code-keyword">function</span> <span class="code-function">canOff</span>(<span class="code-variable">cellId</span>) {<br>
+            &nbsp;&nbsp;<span class="code-comment">// 业务规则：VIP区域禁止关断</span><br>
+            &nbsp;&nbsp;<span class="code-keyword">if</span> (<span class="code-variable">cell</span>.<span class="code-variable">isVip</span>) <span class="code-keyword">return</span> <span class="code-keyword">false</span>;<br>
+            &nbsp;&nbsp;<span class="code-comment">// 业务规则：需有重叠覆盖兜底</span><br>
+            &nbsp;&nbsp;<span class="code-keyword">if</span> (!<span class="code-function">hasOverlap</span>(<span class="code-variable">cellId</span>)) <span class="code-keyword">return</span> <span class="code-keyword">false</span>;<br>
+            &nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-keyword">true</span>;<br>
+            }
+          </div>
+          <div class="lost-knowledge">
+            <span class="warning">⚠️ 人离开后，留下的只是推导后的黑盒结果</span><br>
+            <span style="font-size: 11px;">代码能运行，但业务知识已不可见、不可追溯、不可验证</span>
+          </div>
+        </div>
+        <div class="warning-case">
+          <div class="warning-case-title"><span>⚠️</span> 真实风险案例</div>
+          <div class="warning-case-text">
+            某局点因代码硬编码VIP规则，新开业商圈未及时同步更新，导致误关断小区，引发用户投诉与SLA违约。
+            <span style="color: var(--accent-red);">根因：业务知识困在离职工程师脑中，未形式化留存。</span>
+          </div>
+        </div>
+      </div>
+      <div class="row-r">
+        <div class="implementation-box">
+          <div class="implementation-title">数据 ↔ 本体：自动化映射管道</div>
+          <div class="mapping-viz">
+            <div class="mapping-pipe-group">
+              <div class="mapping-pipe-left">
+                <div class="pipe-label">📋 工参表</div>
+                <div class="pipe-field">CELL_ID · 经纬度</div>
+              </div>
+              <div class="mapping-pipe-arrow">→</div>
+              <div class="mapping-pipe-right">
+                <span class="pipe-target">覆盖区域几何边界</span>
+                <span class="pipe-type pipe-type-table">表→对象</span>
+              </div>
+            </div>
+            <div class="mapping-pipe-group">
+              <div class="mapping-pipe-left">
+                <div class="pipe-label">⚙️ 配置表</div>
+                <div class="pipe-field">REGION_CODE · VIP标识</div>
+              </div>
+              <div class="mapping-pipe-arrow">→</div>
+              <div class="mapping-pipe-right">
+                <span class="pipe-target">区域等级 = 普通 / VIP</span>
+                <span class="pipe-type pipe-type-field">字段→属性</span>
+              </div>
+            </div>
+            <div class="mapping-pipe-group">
+              <div class="mapping-pipe-left">
+                <div class="pipe-label">📄 业务手册</div>
+                <div class="pipe-field">VIP区域管理规范</div>
+              </div>
+              <div class="mapping-pipe-arrow">→</div>
+              <div class="mapping-pipe-right">
+                <span class="pipe-target">约束：VIP禁止关断</span>
+                <span class="pipe-type pipe-type-doc">文档→约束</span>
+              </div>
+            </div>
+          </div>
+          <div class="mapping-flow-note">
+            <span>🔄</span>
+            <span><strong>数据变更 → 自动映射 → 本体实时更新</strong><br><span style="font-size:11px;color:var(--text-muted);">业务知识不再困在代码和文档里，而是变成机器可遍历的图</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3: 数据层 -->
+      <div class="row-div row-div-dat">数据层</div>
+      <div class="row-l">
+        <div class="data-tables">
+          <div class="data-table-card"><div class="table-title">📋 工参表</div><div class="table-row"><span class="field-name">小区ID</span><span class="field-value">CELL_001</span></div><div class="table-row"><span class="field-name">经度</span><span class="field-value">113.756</span></div><div class="table-row"><span class="field-name">纬度</span><span class="field-value">23.028</span></div></div>
+          <div class="fk-connector"><span>CELL_ID</span><div class="fk-line"></div><span>DEV_CODE</span></div>
+          <div class="data-table-card"><div class="table-title">📊 性能表</div><div class="table-row"><span class="field-name">设备编码</span><span class="field-value">DEV_A_01</span></div><div class="table-row"><span class="field-name">实时负载</span><span class="field-value">23%</span></div></div>
+          <div class="fk-connector"><span>REGION_CODE</span><div class="fk-line"></div><span>AREA_ID</span></div>
+          <div class="data-table-card"><div class="table-title">⚙️ 配置表</div><div class="table-row"><span class="field-name">区域ID</span><span class="field-value">AREA_X</span></div><div class="table-row"><span class="field-name">VIP标识</span><span class="field-value">0</span></div></div>
+        </div>
+        <div class="semantic-note">仅有技术外键关联，无业务语义</div>
+      </div>
+      <div class="row-r">
+        <div class="data-onto-map">
+        <div class="data-to-onto-mapping" style="background:var(--bg-primary);border:1px solid var(--border-default);border-radius:10px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;text-align:center;">📊 数据表 → 本体实例：映射关系可视化</div>
+          <svg viewBox="0 0 400 120" width="100%" height="120" style="max-height:120px;">
+            <!-- 数据源节点 -->
+            <rect x="10" y="10" width="100" height="30" rx="6" fill="rgba(249,115,22,0.15)" stroke="rgba(249,115,22,0.4)" stroke-width="1"/>
+            <text x="60" y="30" text-anchor="middle" fill="#f97316" font-size="10" font-weight="600">📋 工参表</text>
+
+            <rect x="10" y="50" width="100" height="30" rx="6" fill="rgba(249,115,22,0.15)" stroke="rgba(249,115,22,0.4)" stroke-width="1"/>
+            <text x="60" y="70" text-anchor="middle" fill="#f97316" font-size="10" font-weight="600">⚙️ 配置表</text>
+
+            <rect x="10" y="90" width="100" height="22" rx="6" fill="rgba(249,115,22,0.15)" stroke="rgba(249,115,22,0.4)" stroke-width="1"/>
+            <text x="60" y="105" text-anchor="middle" fill="#f97316" font-size="9" font-weight="600">📊 性能表</text>
+
+            <!-- 映射箭头 -->
+            <defs>
+              <marker id="mapArrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="#06b6d4"/>
+              </marker>
+            </defs>
+            <line x1="120" y1="25" x2="170" y2="25" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#mapArrow)"/>
+            <line x1="120" y1="65" x2="170" y2="65" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#mapArrow)"/>
+            <line x1="120" y1="100" x2="170" y2="100" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#mapArrow)"/>
+
+            <!-- 映射标签 -->
+            <text x="145" y="20" text-anchor="middle" fill="#64748b" font-size="8">映射</text>
+            <text x="145" y="60" text-anchor="middle" fill="#64748b" font-size="8">映射</text>
+            <text x="145" y="95" text-anchor="middle" fill="#64748b" font-size="8">映射</text>
+
+            <!-- 本体实例节点 -->
+            <rect x="180" y="5" width="110" height="38" rx="6" fill="rgba(6,182,212,0.1)" stroke="rgba(6,182,212,0.4)" stroke-width="1"/>
+            <text x="235" y="22" text-anchor="middle" fill="#06b6d4" font-size="10" font-weight="600">🔷 小区实例</text>
+            <text x="235" y="35" text-anchor="middle" fill="#64748b" font-size="8">位置、覆盖关系</text>
+
+            <rect x="180" y="50" width="110" height="30" rx="6" fill="rgba(6,182,212,0.1)" stroke="rgba(6,182,212,0.4)" stroke-width="1"/>
+            <text x="235" y="70" text-anchor="middle" fill="#06b6d4" font-size="10" font-weight="600">🔷 区域实例</text>
+
+            <rect x="180" y="90" width="110" height="22" rx="6" fill="rgba(6,182,212,0.1)" stroke="rgba(6,182,212,0.4)" stroke-width="1"/>
+            <text x="235" y="105" text-anchor="middle" fill="#06b6d4" font-size="9" font-weight="600">🔷 负载实例</text>
+
+            <!-- 到推理引擎 -->
+            <line x1="300" y1="45" x2="340" y2="45" stroke="#22c55e" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#mapArrowGreen)"/>
+            <defs>
+              <marker id="mapArrowGreen" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="#22c55e"/>
+              </marker>
+            </defs>
+
+            <rect x="345" y="25" width="50" height="40" rx="6" fill="rgba(34,197,94,0.1)" stroke="rgba(34,197,94,0.4)" stroke-width="1"/>
+            <text x="370" y="45" text-anchor="middle" fill="#22c55e" font-size="9" font-weight="600">推理</text>
+            <text x="370" y="57" text-anchor="middle" fill="#22c55e" font-size="8">引擎</text>
+          </svg>
+          <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:4px;">
+            数据零迁移 → 自动映射 → 本体实时感知 → 联合推理
+          </div>
+        </div>
+          <div class="onto-mapping-demo">
+            <div class="map-title">数据表 ▸ 本体实例：自动映射关系（零迁移）</div>
+            <div class="onto-map-graphic">
+              <div class="onto-map-node data">📋 工参表<br><span style="font-size:10px;">CELL_ID, 经纬度</span></div>
+              <div class="onto-map-conn">⟼</div>
+              <div class="onto-map-node onto">🔷 小区实例<br><span style="font-size:10px;">位置属性</span></div>
+              <span style="padding:0 6px;color:var(--text-muted);">|</span>
+              <div class="onto-map-node data">⚙️ 配置表<br><span style="font-size:10px;">REGION, VIP</span></div>
+              <div class="onto-map-conn">⟼</div>
+              <div class="onto-map-node onto">🔷 区域实例<br><span style="font-size:10px;">等级属性</span></div>
+            </div>
+          </div>
+          <div class="onto-mapping-demo" style="margin-top:4px;">
+            <div class="map-title">数据不做迁移，仅定义映射 = 本体自动感知数据变化</div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;color:var(--text-secondary);margin-top:6px;">
+              <span style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);padding:3px 10px;border-radius:6px;color:var(--accent-green);">✓ 零迁移</span>
+              <span>→</span>
+              <span style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);padding:3px 10px;border-radius:6px;color:var(--accent-green);">✓ 零侵入</span>
+              <span>→</span>
+              <span style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);padding:3px 10px;border-radius:6px;color:var(--accent-green);">✓ 实时同步</span>
+            </div>
+          </div>
+          <div class="arch-position">
+            <div class="arch-title">本体语义层在系统架构中的位置</div>
+            <div class="arch-layers">
+              <div class="arch-layer arch-layer-upper"><span>🤖</span> 上层Agent（节能/故障/优化）— 直接读本体</div>
+              <div class="arch-arrow">↑ 调用</div>
+              <div class="arch-layer arch-layer-new"><span>🔍</span> 本体语义层 — 模型+实例+推理（新增）</div>
+              <div class="arch-arrow">↑ 映射</div>
+              <div class="arch-layer arch-layer-existing"><span>💾</span> 现有数据平台 — 工参/性能/配置（不变）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-bar-new bottom-bar-l" style="grid-column:1;">
+        LLM只能"猜测"规则，无法"验证"逻辑<br>
+        <span style="font-size: 12px; opacity: 0.8;">改业务规则 = 改代码（周级别）· 隐性知识随人走</span>
+      </div>
+      <div class="bottom-bar-new bottom-bar-r" style="grid-column:2;">
+        LLM语义理解 + 本体确定性推理，过程透明可验证<br>
+        <span style="font-size: 12px; opacity: 0.8;">改业务规则 = 改数据（分钟级）· 知识形式化留存，不随人走</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第三问 -->
+  <div class="why-not-section">
+    <div class="why-not-header" onclick="toggleWhyNot()">
+      <div class="toggle-icon" id="toggleIcon">▼</div>
+      <div class="why-not-title">为什么不用更简单的方法？</div>
+    </div>
+    <div class="why-not-subtitle">主管常见疑问：元数据加注释/Markdown描述，是不是就够了？</div>
+    <div class="why-not-content" id="whyNotContent">
+      <div class="three-way-grid">
+        <div class="three-way-col col-a">
+          <div class="three-way-col-header"><span>📦</span> 方案A：纯代码硬编码</div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">规则存储</div>
+            <div class="three-way-item-text">规则锁死在 if-else 代码里</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">AI理解方式</div>
+            <div class="three-way-item-text"><span class="x-mark">✗</span> 完全不可见，黑盒调用</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">推理能力</div>
+            <div class="three-way-item-text"><span class="x-mark">✗</span> 无，只能返回true/false</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">结果确定性</div>
+            <div class="three-way-item-text"><span class="x-mark">✗</span> 人工编码，易出错</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">变更成本</div>
+            <div class="three-way-item-text"><span class="x-mark">✗</span> 改代码 = 周级发版</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">可追溯性</div>
+            <div class="three-way-item-text"><span class="x-mark">✗</span> 查代码，找不到业务原因</div>
+          </div>
+        </div>
+        <div class="three-way-col col-b">
+          <div class="three-way-col-header"><span>📝</span> 方案B：元数据+Markdown注释</div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">规则存储</div>
+            <div class="three-way-item-text">字段中文注释 + Markdown业务文档</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">AI理解方式</div>
+            <div class="three-way-item-text"><span class="q-mark">?</span> LLM每次"阅读理解"，可能理解错</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">推理能力</div>
+            <div class="three-way-item-text"><span class="q-mark">~</span> 依赖LLM的"常识推理"，不精确</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">结果确定性</div>
+            <div class="three-way-item-text"><span class="q-mark">~</span> 每次推理结果可能不一致</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">变更成本</div>
+            <div class="three-way-item-text"><span class="q-mark">~</span> 改文档，但AI可能仍按旧理解执行</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">可追溯性</div>
+            <div class="three-way-item-text"><span class="q-mark">~</span> 查文档历史，但文档与代码可能不同步</div>
+          </div>
+        </div>
+        <div class="three-way-col col-c">
+          <div class="three-way-col-header"><span>🔍</span> 方案C：本体语义层（推荐）</div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">规则存储</div>
+            <div class="three-way-item-text">规则形式化为机器可执行的数据关系</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">AI理解方式</div>
+            <div class="three-way-item-text"><span class="check-mark">✓</span> 直接遍历图谱，100%精确</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">推理能力</div>
+            <div class="three-way-item-text"><span class="check-mark">✓</span> 基于形式化逻辑自动推导</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">结果确定性</div>
+            <div class="three-way-item-text"><span class="check-mark">✓</span> 推理过程100%可追溯、可验证</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">变更成本</div>
+            <div class="three-way-item-text"><span class="check-mark">✓</span> 改数据 = 分钟级生效</div>
+          </div>
+          <div class="three-way-item">
+            <div class="three-way-item-title">可追溯性</div>
+            <div class="three-way-item-text"><span class="check-mark">✓</span> 完整证据链，每一步可审计</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="analogy-box">
+        <div class="analogy-title"><span>💡</span> 核心差异类比</div>
+        <div class="analogy-text">
+          让大模型读Markdown理解业务规则，就像让医生每次看病都重新翻医学教科书——<strong>每次理解可能有偏差，且无法保证每次结论一致</strong>。<br><br>
+          本体语义层相当于把教科书知识编码成<strong>"临床决策支持系统"</strong>——规则被形式化、可执行、结果可验证，AI不是"猜测"规则含义，而是<strong>"执行"确定性的逻辑推导</strong>。<br><br>
+          <span style="color: #06b6d4;">元数据告诉你"小区A覆盖区域X"；本体可以推导出"因为A覆盖X且B覆盖X且X是普通区域，所以A可关断"。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROI -->
+  <div class="roi-section">
+    <div class="section-title"><div class="icon"></div>投入产出速览</div>
+    <div class="roi-grid">
+      <div class="roi-card">
+        <div class="roi-value blue">2-3人×2月</div>
+        <div class="roi-label">一次性构建成本</div>
+        <div class="roi-detail">本体建模工程师 + 业务专家协同</div>
+      </div>
+      <div class="roi-card">
+        <div class="roi-value green">分钟级</div>
+        <div class="roi-label">规则变更响应</div>
+        <div class="roi-detail">vs 传统代码发版的周级周期</div>
+      </div>
+      <div class="roi-card">
+        <div class="roi-value orange">100%</div>
+        <div class="roi-label">推理过程可追溯</div>
+        <div class="roi-detail">每一步推导有明确依据，可审计可验证</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 总结 -->
+  <div class="summary-section">
+    <div class="summary-title">以前AI盲猜 → 现在AI可证</div>
+    <div class="summary-compare">
+      <div class="summary-item left">
+        <span class="tag">传统API+注释</span><br>
+        AI调用黑盒函数，只能得到结果（无法验证）
+      </div>
+      <div class="summary-arrow">→</div>
+      <div class="summary-item right">
+        <span class="tag">本体语义层</span><br>
+        AI查询白盒图谱，"亲眼"看到关系和属性，自主推导出结论（可追溯）
+      </div>
+    </div>
+    <div class="summary-hashtag"># 为AI装上"可解释的眼睛"</div>
+    <div class="standard-note">
+      基于 <span title="W3C语义网标准：OWL是本体描述语言，RDF是资源描述框架">W3C OWL/RDF</span> 语义网标准，机器可自动验证逻辑一致性
+    </div>
+  </div>
+
+</div>
+
+<script>
+function toggleWhyNot() {
+  const content = document.getElementById('whyNotContent');
+  const header = document.querySelector('.why-not-header');
+  const icon = document.getElementById('toggleIcon');
+  if (content.style.maxHeight === '0px') {
+    content.style.maxHeight = '2000px'; content.style.opacity = '1'; content.style.overflow = 'visible';
+    header.classList.remove('collapsed'); icon.textContent = '▼';
+  } else {
+    content.style.maxHeight = '0px'; content.style.opacity = '0'; content.style.overflow = 'hidden';
+    header.classList.add('collapsed'); icon.textContent = '▶';
+  }
+}
+// 默认展开第三问
+document.addEventListener('DOMContentLoaded', function() {
+  const content = document.getElementById('whyNotContent');
+  const header = document.querySelector('.why-not-header');
+  const icon = document.getElementById('toggleIcon');
+  if(content && header && icon) {
+    content.style.maxHeight = '2000px'; content.style.opacity = '1'; content.style.overflow = 'visible';
+    header.classList.remove('collapsed'); icon.textContent = '▼';
+  }
+});
+</script>
+
+</body>
+</html>
